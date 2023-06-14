@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include <hash.h>
 
 enum vm_type {
 	/* page not initialized */
@@ -27,6 +28,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+#include <hash.h>
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -45,7 +47,16 @@ struct page {
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 
+	bool writable;        /* True일 경우, 주소에 write 가능 False 일경우 write 불가능 */
+	bool is_loaded;       /* 물리메모리의 탑재 여부를 알려주는 플래그 */
+	struct file* file;    /* 가상주소와 맵핑된 파일*/
+	
 	/* Your implementation */
+	size_t offset;        /* 읽어야 할 파일 오프셋 */
+	size_t read_bytes;    /* 가상페이지에 쓰여져 있는 데이터 크기 */
+	size_t zero_bytes;    /* 0으로 채울 남은 페이지의 바이트 */
+
+	struct hash_elem h_elem;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -85,6 +96,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash hash_vm;
 };
 
 #include "threads/thread.h"
