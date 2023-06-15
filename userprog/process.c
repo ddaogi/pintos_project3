@@ -22,8 +22,10 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
+#define VM
 #ifdef VM
 #include "vm/vm.h"
+#include "vm/uninit.h"
 #endif
 
 static void process_cleanup(void);
