@@ -20,12 +20,13 @@ static struct hash_elem *find_elem (struct hash *, struct list *,
 static void insert_elem (struct hash *, struct list *, struct hash_elem *);
 static void remove_elem (struct hash *, struct hash_elem *);
 static void rehash (struct hash *);
-
+// 
 /* Initializes hash table H to compute hash values using HASH and
    compare hash elements using LESS, given auxiliary data AUX. */
 bool
 hash_init (struct hash *h,
 		hash_hash_func *hash, hash_less_func *less, void *aux) {
+	
 	h->elem_cnt = 0;
 	h->bucket_cnt = 4;
 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
@@ -394,15 +395,15 @@ remove_elem (struct hash *h, struct hash_elem *e) {
 	list_remove (&e->list_elem);
 }
 
-unsigned page_hash( const struct hash_elem *p_, void *aux UNUSED){
-	const struct page *p = hash_entry(p_, struct page, h_elem);
-	return hash_bytes (&p->va, sizeof p->va);
-}
+// unsigned page_hash( const struct hash_elem *p_, void *aux){
+// 	const struct page *p = hash_entry(p_, struct page, h_elem);
+// 	return hash_bytes (&p->va, sizeof p->va);
+// }
 
-bool page_less (const struct hash_elem *a_,
-				const struct hash_elem *b_, void *aux UNUSED){
-	const struct page *a = hash_entry (a_, struct page, h_elem);
-	const struct page *b = hash_entry (b_, struct page, h_elem);
+// bool page_less (const struct hash_elem *a_,
+// 				const struct hash_elem *b_, void *aux ){
+// 	const struct page *a = hash_entry (a_, struct page, h_elem);
+// 	const struct page *b = hash_entry (b_, struct page, h_elem);
 
-	return a->va < b->va;
-}
+// 	return a->va < b->va;
+// }

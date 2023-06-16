@@ -47,14 +47,14 @@ struct page {
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 
-	bool writable;        /* True일 경우, 주소에 write 가능 False 일경우 write 불가능 */
-	bool is_loaded;       /* 물리메모리의 탑재 여부를 알려주는 플래그 */
-	struct file* file;    /* 가상주소와 맵핑된 파일*/
+	bool writable;         /* True일 경우, 주소에 write 가능 False 일경우 write 불가능 */
+	bool is_loaded;        /* 물리메모리의 탑재 여부를 알려주는 플래그 */
+	struct file* m_file;   /* 가상주소와 맵핑된 파일*/
 	
 	/* Your implementation */
-	size_t offset;        /* 읽어야 할 파일 오프셋 */
-	size_t read_bytes;    /* 가상페이지에 쓰여져 있는 데이터 크기 */
-	size_t zero_bytes;    /* 0으로 채울 남은 페이지의 바이트 */
+	size_t offset;         /* 읽어야 할 파일 오프셋 */
+	size_t read_bytes;     /* 가상페이지에 쓰여져 있는 데이터 크기 */
+	size_t zero_bytes;     /* 0으로 채울 남은 페이지의 바이트 */
 
 	struct hash_elem h_elem;
 
@@ -124,7 +124,11 @@ enum vm_type page_get_type (struct page *page);
 struct aux_struct{
 	struct file* file;
 	off_t offset;
-	uint32_t read_bytes;
-}
+	uint32_t page_read_bytes;
+	bool writable;
+};
+
+unsigned page_hash (const struct hash_elem *, void *);
+bool page_less (const struct hash_elem *, const struct hash_elem *, void *);
 
 #endif  /* VM_VM_H */
