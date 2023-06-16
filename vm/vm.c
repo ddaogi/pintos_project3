@@ -56,8 +56,20 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* TODO: Create the page, fetch the initialier according to the VM type,
 		 * TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
-
+		/*여기서 페이지를 만들어줌 VM type에 따른 initalizer를 fetch 해줌*/				
+		
+		struct page *new_page = (struct page*)malloc(sizeof(struct page));
+		if(type == VM_ANON){
+			// init = anon_initializer;
+			uninit_new(new_page,upage,init,type,aux,anon_initializer);
+		}else if(type == VM_FILE){
+			// init = file_backed_initializer;
+			uninit_new(new_page,upage,init,type,aux,file_backed_initializer);
+		}else{
+			return false;
+		}
 		/* TODO: Insert the page into the spt. */
+		spt_insert_page(spt, new_page);
 	}
 err:
 	return false;
@@ -69,19 +81,6 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt/*UNUSED*/, void *va /*UNUSED*/) {
 	
-	// struct page *page = NULL;
-	// page = malloc(sizeof(struct page));
-	// page->va = pg_round_down(va);
-	// struct hash_elem *find_h_elem = hash_find(&spt->hash_vm, &page->h_elem);
-	
-	// if(find_h_elem == NULL) 
-	// {
-	// 	free(page);
-	// 	return NULL;
-	// }
-	// struct page *find_page = hash_entry(find_h_elem, struct page, h_elem);
-
-	// free(page);
 	/* TODO: Fill this function. */
 
 	struct page *temp_page = malloc(sizeof(struct page));
@@ -151,8 +150,10 @@ vm_get_frame (void) {
     /* TODO: Fill this function. */
     ASSERT (frame != NULL);
     ASSERT (frame->page == NULL);
-    void* new_page = palloc_get_page(PAL_USER);
     
+	/* */
+	void* new_page = palloc_get_page(PAL_USER);
+
 
     if(new_page == NULL){
         PANIC("todo");
@@ -199,33 +200,27 @@ vm_dealloc_page (struct page *page) {
 
 /* Claim the page that allocate on VA. */
 bool
-vm_claim_page (void *va UNUSED) {
-	
-	/* 여기서 할당하라고 하는 페이지는 struct page가 아닌듯 */
-	struct page *page = (struct page*)malloc(sizeof(struct page));
-	page->va = pg_round_down(va);
-
-	if( spt_find_page(&thread_current()->spt,va) == NULL){
-		return vm_do_claim_page(page);
-	}else{
-		return false;
-	}
+vm_claim_page (void *va /*UNUSED*/) {
+    struct page *page = NULL;
+    page = spt_find_page(thread_current()->spt,va);
+    if(page==NULL) return false;
+    return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
 static bool
 vm_do_claim_page (struct page *page) {
-	struct frame *frame = vm_get_frame (); /*프레임 만듬 */
-	/* Set links */
-	frame->page = page;
-	page->frame = frame;
-
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	/* 페이지 테이블에 매핑한 정보를 넣어야되는데 어떻게할까? */
-	return spt_insert_page(&thread_current()->spt,page);
-	
-	/* return swap_in (page, frame->kva); */
+	struct frame *frame = vm_get_frame ();
+    /* Set links */
+    frame->page = page;
+    page->frame = frame;
+    /* TODO: Insert page table entry to map page's VA to frame's PA. */
+    // spt_insert_page(thread_current()->spt, page);
+    bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
+    if (!succ) return false;
+    return swap_in (page, frame->kva);
 }
+
 
 /* Initialize new supplemental page table
 	위의 함수는 보조 페이지 테이블를 초기화합니다. 
