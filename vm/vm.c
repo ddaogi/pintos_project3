@@ -7,6 +7,7 @@
 #include <hash.h>
 #include "threads/vaddr.h"
 #include "threads/thread.h"
+#include "threads/mmu.h"
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -47,6 +48,8 @@ bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
 
+			/* init은 lazy load segment를 받아옴 */
+
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
@@ -70,6 +73,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		}
 		/* TODO: Insert the page into the spt. */
 		spt_insert_page(spt, new_page);
+		return true;
 	}
 err:
 	return false;
@@ -148,20 +152,18 @@ vm_get_frame (void) {
 
 	/* 우근이형은 frame에 palloc을 해야한다고함 */
     /* TODO: Fill this function. */
-    ASSERT (frame != NULL);
-    ASSERT (frame->page == NULL);
-    
 	/* */
 	void* new_page = palloc_get_page(PAL_USER);
-
 
     if(new_page == NULL){
         PANIC("todo");
     }else{
         frame->kva = new_page;
         frame->page = NULL;
-        return frame;
     }
+    ASSERT (frame != NULL);
+    ASSERT (frame->page == NULL);
+	return frame;
 }
 /* Growing the stack. */
 static void
@@ -183,6 +185,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
 
 	/* TODO: Validate the fault */
+	/* 진짜 page fault인지, bogus인지 확인하라는 뜻 같음*/
+
+
 	/* TODO: Your code goes here */
 
 
@@ -202,9 +207,11 @@ vm_dealloc_page (struct page *page) {
 bool
 vm_claim_page (void *va /*UNUSED*/) {
     struct page *page = NULL;
-    page = spt_find_page(thread_current()->spt,va);
-    if(page==NULL) return false;
-    return vm_do_claim_page (page);
+	
+    page = spt_find_page(&thread_current()->spt,va);
+    
+	/* spt에 찾는 page가 없으면 어떡함? */
+	return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
@@ -216,8 +223,12 @@ vm_do_claim_page (struct page *page) {
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
     // spt_insert_page(thread_current()->spt, page);
+	
     bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
-    if (!succ) return false;
+    if (!succ){
+		return false;
+		
+	} 
     return swap_in (page, frame->kva);
 }
 
@@ -228,14 +239,19 @@ vm_do_claim_page (struct page *page) {
 	userprog/process.c의 initd 함수로 새로운 프로세스가 시작하거나 
 	process.c의 __do_fork로 자식 프로세스가 생성될 때 위의 함수가 호출됩니다.*/
 void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_init (struct supplemental_page_table *spt ) {
 	hash_init(&spt->hash_vm,page_hash,page_less,NULL);
+		
 }
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
+		struct supplemental_page_table *src /*UNUSED*/) {
+	void* new_page;
+	vm_alloc_page(VM_UNINIT,new_page,true);
+	
+	
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -243,4 +259,17 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+}
+
+unsigned page_hash( const struct hash_elem *p_, void *aux){
+	const struct page *p = hash_entry(p_, struct page, h_elem);
+	return hash_bytes (&p->va, sizeof p->va);
+}
+
+bool page_less (const struct hash_elem *a_,
+				const struct hash_elem *b_, void *aux ){
+	const struct page *a = hash_entry (a_, struct page, h_elem);
+	const struct page *b = hash_entry (b_, struct page, h_elem);
+
+	return a->va < b->va;
 }

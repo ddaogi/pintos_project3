@@ -22,6 +22,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
+#include "lib/kernel/hash.h" 
 #define VM
 #ifdef VM
 #include "vm/vm.h"
@@ -500,7 +501,7 @@ load(const char *file_name, struct intr_frame *if_)
    off_t file_ofs;
    bool success = false;
    int i;
-
+   
    /* Allocate and activate page directory. */
    t->pml4 = pml4_create();
    if (t->pml4 == NULL)
@@ -579,8 +580,9 @@ load(const char *file_name, struct intr_frame *if_)
                zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
             }
             if (!load_segment(file, file_page, (void *)mem_page,
-                              read_bytes, zero_bytes, writable))
+                              read_bytes, zero_bytes, writable)){
                goto done;
+               }
          }
          else
             goto done;
@@ -589,8 +591,10 @@ load(const char *file_name, struct intr_frame *if_)
    }
 
    /* Set up stack. */
-   if (!setup_stack(if_))
+   if (!setup_stack(if_)){
+      /* 실패했으니까 들어오지 */
       goto done;
+   }
 
    /* Start address. */
    if_->rip = ehdr.e_entry;
@@ -760,22 +764,55 @@ install_page(void *upage, void *kpage, bool writable)
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
+static bool
+install_page(void *upage, void *kpage, bool writable)
+{
+   struct thread *t = thread_current();
 
+   /* Verify that there's not already a page at that virtual
+    * address, then map our page there. */
+   return (pml4_get_page(t->pml4, upage) == NULL && pml4_set_page(t->pml4, upage, kpage, writable));
+}
+
+/* 우영우 코드 */
 static bool
 lazy_load_segment(struct page *page, void *aux)
 {
    struct aux_struct *aux_ = (struct aux_struct *)aux;
    /* TODO: Load the segment from the file */
-  struct file* file = aux_->file;
-  off_t ofs = aux_->offset;
+   struct file* file = aux_->file;
+   off_t ofs = aux_->offset;
+   uint32_t read_bytes = aux_->page_read_bytes;
+   bool writable = aux_->writable;
+   size_t zero_bytes = PGSIZE - read_bytes;
+   
+   //기존에 있던 load_segment부분 참고하면서 실제로 주어진 물리메모리에 주어진 파일을 읽게하기
+   //페이지폴트가 발생했을 때 호출 하도록 해야할듯 
+   //인자로 받아온 page는 upage?
 
-  file_seek(file,ofs);
+   uint8_t *kpage = palloc_get_page(PAL_USER);
 
+   file_seek(file,ofs);
+   /* read_bytes 만큼 읽어오라고했는데 같지않음*/
+   if( file_read(file,page->va,read_bytes) != read_bytes){
+      palloc_free_page(kpage);
+      return false;
+   }
 
+   memset( (uint32_t *)page->va + read_bytes, 0, zero_bytes);
+   
+   if (!install_page(page->va, kpage, writable))
+   {
+      palloc_free_page(kpage);
+      printf("fail\n");
+      return false;
+   }
+   
+   return true;
    /* TODO: This called when the first page fault occurs on address VA. */
    /* TODO: VA is available when calling this function. */
-
 }
+/*우영우 코드 끝*/
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -797,7 +834,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 {
    /* ofs - file_page address? 
       upage  */
-
+   
    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
    ASSERT(pg_ofs(upage) == 0);
    ASSERT(ofs % PGSIZE == 0);
@@ -818,38 +855,59 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       struct aux_struct* aux_struct = malloc(sizeof(struct aux_struct));
       aux_struct->file= file;
       aux_struct->offset = ofs;
-      aux_struct->read_bytes = page_read_bytes;
-      
+      aux_struct->page_read_bytes = page_read_bytes;
+      aux_struct->writable = writable;
       aux = aux_struct;
       
       if (!vm_alloc_page_with_initializer(VM_ANON, upage,
                                           writable, lazy_load_segment, aux))
          return false;
 
+      
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       ofs+= page_read_bytes;
       upage += PGSIZE;
    }
+   
    return true;
 }
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
+/*
+
+
+이후,해당 페이지에 곧바로 물리 프레임을 할당시켜 ANON 타입의 페이지로 설정합니다.만약 해당 함수 호출이 성공할 경우 if의 rsp값을 USER_STACK으로 변경합니다.
+즉, 프로젝트2의 argument passing에서 저희가 스택에 인자를 쌓았을때 그 인자들이 쌓인 페이지는 Lazy-Loading 되지 않고 곧바로 사용되어야하기에 setup_stack() 함수에서 이를 설정해주는것입니다.
+설정된 rsp인 USER_STACK부터 argument passing의 인자가 쌓입니다.
+쉽게 말하면 어차피 바로 써야할 페이지에 대해서 미리 물리 프레임을 연결해주는 함수입니다.*/
 static bool
 setup_stack(struct intr_frame *if_)
 {
    bool success = false;
+   /* 한개의 페이지 크기만큼을 USER_STACK 주소에서 내려 새로운 스택 바텀으로 설정.*/
    void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+   
+   /* 방우현 코드 */
+      
+   if(vm_alloc_page(VM_ANON, stack_bottom, true)){ 
+      success = vm_claim_page(stack_bottom);
+      /* vm_alloc_page()를 호출하여 바로 하나의 UNINIT 페이지를 생성 */
+      if (success)
+      {
+         if_->rsp = USER_STACK; /* 왜 rsp를 USER_STACK 으로 바꿔주지?? */
+      }
+   }
+   // palloc_free_page(kpage); // ??
+
+   /*방우현 코드 끝 */
 
    /* TODO: Map the stack on stack_bottom and claim the page immediately.
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
    /* TODO: Your code goes here */
    
-   
-
-
    return success;
 }
 #endif /* VM */
