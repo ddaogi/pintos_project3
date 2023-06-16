@@ -534,6 +534,7 @@ load(const char *file_name, struct intr_frame *if_)
    for (i = 0; i < ehdr.e_phnum; i++)
    {
       struct Phdr phdr;
+      
 
       if (file_ofs < 0 || file_ofs > file_length(file))
          goto done;
@@ -763,9 +764,17 @@ install_page(void *upage, void *kpage, bool writable)
 static bool
 lazy_load_segment(struct page *page, void *aux)
 {
+   struct aux_struct *aux_ = (struct aux_struct *)aux;
    /* TODO: Load the segment from the file */
+  struct file* file = aux_->file;
+  off_t ofs = aux_->offset;
+
+  file_seek(file,ofs);
+
+
    /* TODO: This called when the first page fault occurs on address VA. */
    /* TODO: VA is available when calling this function. */
+
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -786,6 +795,9 @@ static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
+   /* ofs - file_page address? 
+      upage  */
+
    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
    ASSERT(pg_ofs(upage) == 0);
    ASSERT(ofs % PGSIZE == 0);
@@ -798,8 +810,18 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* TODO: Set up aux to pass information to the lazy_load_segment. */
+      /* TODO: Set up aux to pass information to the lazy_load_segment. 
+       aux 인자로써 보조 값들을 설정할 필요가 있음
+       당신은 바이너리 파일을 로드할 때 필수적인 정보를 포함하는 구조체를 생성하는 것이 좋다.*/
+
       void *aux = NULL;
+      struct aux_struct* aux_struct = malloc(sizeof(struct aux_struct));
+      aux_struct->file= file;
+      aux_struct->offset = ofs;
+      aux_struct->read_bytes = page_read_bytes;
+      
+      aux = aux_struct;
+      
       if (!vm_alloc_page_with_initializer(VM_ANON, upage,
                                           writable, lazy_load_segment, aux))
          return false;
@@ -807,6 +829,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs+= page_read_bytes;
       upage += PGSIZE;
    }
    return true;
@@ -823,6 +846,9 @@ setup_stack(struct intr_frame *if_)
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
    /* TODO: Your code goes here */
+   
+   
+
 
    return success;
 }
