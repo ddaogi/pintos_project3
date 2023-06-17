@@ -235,15 +235,12 @@ vm_do_claim_page (struct page *page) {
     frame->page = page;
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
-    // spt_insert_page(thread_current()->spt, page);
 		
-	
     bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
     if (!succ){
 		return false;
 	} 
-	// swap_in (page, frame->kva);
-	return true;
+	return swap_in (page, frame->kva);
 }
 
 

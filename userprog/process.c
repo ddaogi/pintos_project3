@@ -684,7 +684,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
    ASSERT(pg_ofs(upage) == 0);
    ASSERT(ofs % PGSIZE == 0);
-
+   
    file_seek(file, ofs);
    while (read_bytes > 0 || zero_bytes > 0)
    {
@@ -790,25 +790,25 @@ lazy_load_segment(struct page *page, void *aux)
    //페이지폴트가 발생했을 때 호출 하도록 해야할듯 
    //인자로 받아온 page는 upage?
 
-   uint8_t *kpage = palloc_get_page(PAL_USER);
+   // uint8_t *kpage = palloc_get_page(PAL_USER);
 
    file_seek(file,ofs);
    
    /* read_bytes 만큼 읽어오라고했는데 같지않을 경우*/
    if( file_read(file,page->va,read_bytes) != read_bytes){
-      palloc_free_page(kpage);
+      // palloc_free_page(kpage);
       return false;
    }
 
    /* 다 읽고 나면 0으로 채워줌 */
-   memset( (uint32_t *)page->va + read_bytes, 0, zero_bytes);
+   memset( (uint32_t *)page->frame->kva + read_bytes, 0, zero_bytes);
    
-   if (!install_page(page->va, kpage, writable))
-   {
-      palloc_free_page(kpage);
-      printf("fail\n");
-      return false;
-   }
+   // if (!install_page(page->va, kpage, writable))
+   // {
+   //    palloc_free_page(kpage);
+   //    printf("fail\n");
+   //    return false;
+   // }
    
    return true;
    /* TODO: This called when the first page fault occurs on address VA. */
@@ -839,7 +839,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 {
    /* ofs - file_page address? 
       upage  */
-
+  
    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
    ASSERT(pg_ofs(upage) == 0);
    ASSERT(ofs % PGSIZE == 0);
