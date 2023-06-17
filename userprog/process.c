@@ -793,12 +793,14 @@ lazy_load_segment(struct page *page, void *aux)
    uint8_t *kpage = palloc_get_page(PAL_USER);
 
    file_seek(file,ofs);
-   /* read_bytes 만큼 읽어오라고했는데 같지않음*/
+   
+   /* read_bytes 만큼 읽어오라고했는데 같지않을 경우*/
    if( file_read(file,page->va,read_bytes) != read_bytes){
       palloc_free_page(kpage);
       return false;
    }
 
+   /* 다 읽고 나면 0으로 채워줌 */
    memset( (uint32_t *)page->va + read_bytes, 0, zero_bytes);
    
    if (!install_page(page->va, kpage, writable))
@@ -810,7 +812,10 @@ lazy_load_segment(struct page *page, void *aux)
    
    return true;
    /* TODO: This called when the first page fault occurs on address VA. */
+   /* TODO 번역: 해당 Virtual Address에 발생한 첫번째 페이지 폴트 발생시에, 이 함수가 호출된다*/
    /* TODO: VA is available when calling this function. */
+   /* TODO 번역: 이 함수가 호출된 이후에는, 해당 Virtual Address 는 available 하다 */
+
 }
 /*우영우 코드 끝*/
 
@@ -834,7 +839,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 {
    /* ofs - file_page address? 
       upage  */
-   
+
    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
    ASSERT(pg_ofs(upage) == 0);
    ASSERT(ofs % PGSIZE == 0);
@@ -862,7 +867,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       if (!vm_alloc_page_with_initializer(VM_ANON, upage,
                                           writable, lazy_load_segment, aux))
          return false;
-
       
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -876,8 +880,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 /*
-
-
 이후,해당 페이지에 곧바로 물리 프레임을 할당시켜 ANON 타입의 페이지로 설정합니다.만약 해당 함수 호출이 성공할 경우 if의 rsp값을 USER_STACK으로 변경합니다.
 즉, 프로젝트2의 argument passing에서 저희가 스택에 인자를 쌓았을때 그 인자들이 쌓인 페이지는 Lazy-Loading 되지 않고 곧바로 사용되어야하기에 setup_stack() 함수에서 이를 설정해주는것입니다.
 설정된 rsp인 USER_STACK부터 argument passing의 인자가 쌓입니다.
@@ -894,15 +896,12 @@ setup_stack(struct intr_frame *if_)
    if(vm_alloc_page(VM_ANON, stack_bottom, true)){ 
       success = vm_claim_page(stack_bottom);
       /* vm_alloc_page()를 호출하여 바로 하나의 UNINIT 페이지를 생성 */
-      if (success)
-      {
+      if (success){
          if_->rsp = USER_STACK; /* 왜 rsp를 USER_STACK 으로 바꿔주지?? */
       }
    }
-   // palloc_free_page(kpage); // ??
-
-   /*방우현 코드 끝 */
-
+   
+      /*방우현 코드 끝 */
    /* TODO: Map the stack on stack_bottom and claim the page immediately.
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
