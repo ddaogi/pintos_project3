@@ -121,6 +121,7 @@ struct thread
 
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
+   uint64_t rsp; /*스택 포인터 */
 
    
 
