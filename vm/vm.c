@@ -91,7 +91,7 @@ spt_find_page (struct supplemental_page_table *spt/*UNUSED*/, void *va /*UNUSED*
 
   	struct hash_elem *hash_elem;
 
-  	temp_page->va = va;
+  	temp_page->va = pg_round_down(va);
   	hash_elem = hash_find (&spt->hash_vm, &temp_page->h_elem);
 	if (hash_elem == NULL) {
 		free(temp_page);
@@ -150,7 +150,6 @@ static struct frame *
 vm_get_frame (void) {
     struct frame *frame = (struct frame*) malloc(sizeof(struct frame));
 
-	/* 우근이형은 frame에 palloc을 해야한다고함 */
     /* TODO: Fill this function. */
 	/* */
 	void* new_page = palloc_get_page(PAL_USER);
@@ -168,6 +167,7 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	/* PAGE 만큼 낮춰야한다.. */
 }
 
 /* Handle the fault on write_protected page */
@@ -177,22 +177,34 @@ vm_handle_wp (struct page *page UNUSED) {
 
 /* Return true on success */
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+vm_try_handle_fault (struct intr_frame *f , void *addr,
+		bool user , bool write, bool not_present ) {
+	/* addr은 page_fault에서 보낸 fault address */
 
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 
 
+	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
+	 함수 vm_try_handle_fault를 수정하세요. */
+	
+	page = spt_find_page(spt, addr);
+	
+	// if(page == NULL)
+	// 	PANIC("STOP");
+	
+
+
 	/* TODO: Validate the fault */
 	/* 진짜 page fault인지, bogus인지 확인하라는 뜻 같음*/
 
-
 	/* TODO: Your code goes here */
+	/* stack growth 함수를 호출해야함? */
 
-
-
-	return vm_do_claim_page (page);
+	bool ret = vm_do_claim_page(page);
+	//PANIC("woohyun22"); /*이게 안나옴*/
+	return ret;
+	// return vm_do_claim_page (page);
 }
 
 /* Free the page.
@@ -211,6 +223,7 @@ vm_claim_page (void *va /*UNUSED*/) {
     page = spt_find_page(&thread_current()->spt,va);
     
 	/* spt에 찾는 page가 없으면 어떡함? */
+	
 	return vm_do_claim_page (page);
 }
 
@@ -223,13 +236,14 @@ vm_do_claim_page (struct page *page) {
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
     // spt_insert_page(thread_current()->spt, page);
+		
 	
     bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
     if (!succ){
 		return false;
-		
 	} 
-    return swap_in (page, frame->kva);
+	// swap_in (page, frame->kva);
+	return true;
 }
 
 
@@ -241,7 +255,6 @@ vm_do_claim_page (struct page *page) {
 void
 supplemental_page_table_init (struct supplemental_page_table *spt ) {
 	hash_init(&spt->hash_vm,page_hash,page_less,NULL);
-		
 }
 
 /* Copy supplemental page table from src to dst */
