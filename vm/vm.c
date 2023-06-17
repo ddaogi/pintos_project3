@@ -8,6 +8,8 @@
 #include "threads/vaddr.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
+#include <string.h>
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -235,15 +237,12 @@ vm_do_claim_page (struct page *page) {
     frame->page = page;
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
-    // spt_insert_page(thread_current()->spt, page);
 		
-	
     bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
     if (!succ){
 		return false;
 	} 
-	// swap_in (page, frame->kva);
-	return true;
+	return swap_in (page, frame->kva);
 }
 
 
@@ -258,11 +257,48 @@ supplemental_page_table_init (struct supplemental_page_table *spt ) {
 }
 
 /* Copy supplemental page table from src to dst */
+/*해당 함수는 부모 프로세스가 가지고 있는 본인의 SPT 정보를 빠짐없이 자식 프로세스에게 복사해주는 기능을 수행합니다.(fork 시스템 콜)
+우선 해시테이블을 통해 구현한 SPT를 iteration해줘야 합니다. 이를 구현하기 위한 방법을 hash.c 파일에서 제공합니다.
+
+이후 iter를 돌 때마다 해당 hash_elem과 연결된 page를 찾아서 해당 페이지 구조체의 정보들을 저장합니다.
+페이지 구조체의 어떠한 정보를 저장해야할지 감이 안오신다면 vm_alloc_page_with_initializer()함수의 인자를 참고하시길 바랍니다.
+
+부모 페이지들의 정보를 저장한 뒤,자식이 가질 새로운 페이지를 생성해야합니다.생성을 위해 부모 페이지의 타입을 먼저 검사합니다.
+즉,부모 페이지가UNINIT 페이지인 경우와 그렇지 않은 경우를 나누어 페이지를 생성해줘야합니다.
+
+만약 uninit이 아닌 경우 setup_stack()함수에서 했던 것처럼 페이지를 생성한뒤 바로 해당 페이지의 타입에 맞는 initializer를 호출해 페이지 타입을 변경시켜줍니다.
+그리고 나서 부모페이지의 물리 메모리 정보를 자식에게도 복사해주어야 합니다.
+
+모든 함수 호출이 정상적으로 이루어졌다면 return true를 하며 함수를 종료합니다.*/
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		struct supplemental_page_table *src /*UNUSED*/) {
-	void* new_page;
-	vm_alloc_page(VM_UNINIT,new_page,true);
+	struct hash_iterator i;
+	hash_first(&i,&src->hash_vm);
+	while(hash_next(&i)){
+		struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
+		enum vm_type src_type = page_get_type(src_p);
+	
+		// if( src_type != VM_UNINIT ){
+			/* dst는 thread_current()->spt다  */
+		void* upage = src_p->va;
+		/* dst에 알아서 struct page를 넣어줌 */
+		vm_alloc_page(src_type,upage,true);
+
+		vm_claim_page(upage);
+		struct page *dst_p = spt_find_page(dst,upage);
+		dst_p->writable = src_p->writable;
+		dst_p->read_bytes = src_p->read_bytes;
+		dst_p->offset = src_p->offset;
+		memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE);
+		// }
+
+		/* 복사를 해준다ㅡ*/
+		 /* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
+	}
+
+	return true;
+
 	
 	
 }
