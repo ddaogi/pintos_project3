@@ -350,8 +350,10 @@ void close(int fd)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
-   {
+   if ( is_kernel_vaddr(addr)){
+      exit(-1);
+   } else if(pml4_get_page(curr->pml4, addr) == NULL){
       exit(-1);
    }
+
 }
