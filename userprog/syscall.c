@@ -241,8 +241,9 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 */
 int read(int fd, void *buffer, unsigned size)
 {
-
-   check_valid_buffer(buffer,size,1);
+#ifdef VM
+   check_valid_buffer(buffer, size, 1);
+#endif
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -348,41 +349,12 @@ void close(int fd)
    process_close_file(fd);
    return file_close(close_file);
 }
-/*
-주소 값이 유저 영역 주소 값인지 확인
-유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
-*/
-// struct page *check_address(void *addr)
-// {
-//    struct thread *curr = thread_current();
-//    if ( is_kernel_vaddr(addr)){
-      
-      
-//       exit(-1);
-//    }   
-//    struct page* get_page = spt_find_page(&curr->spt, addr);
-//    if(get_page == NULL) {
-//       exit(-1);
-//       }
-//    return get_page;
-// }
-// void check_valid_buffer(void* buffer, unsigned size, bool to_write){
-//     for(char i=0; i<size; i++){
-//         struct page* page = check_address(buffer + i);
-        
-
-//         /* 써야되는데 page->writable이 false? */
-//         if(to_write == true && page->writable == false){
-//             // PANIC(" WOOOOOO %p", page->va);
-//             exit(-1);
-//         }
-//     }
-// }
 
 struct page *check_address(void *addr)
 {
    struct thread *curr = thread_current();
 #ifdef VM
+   if (addr ==NULL) exit(-1);
    struct page *page = spt_find_page(&thread_current()->spt, addr);
    if (is_kernel_vaddr(addr) || !addr || !page)
    {

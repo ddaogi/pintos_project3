@@ -140,6 +140,10 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
    /* 3. TODO: Allocate new PAL_USER page for the child and set result to
     *    TODO: NEWPAGE. */
    newpage = palloc_get_page(PAL_USER);
+	if (newpage == NULL)
+	{
+		return false;
+	} // 심심좌 암살
    /* 4. TODO: Duplicate parent's page to the new page and
     *    TODO: check whether parent's page is writable or not (set WRITABLE
     *    TODO: according to the result). */
@@ -150,6 +154,7 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
    if (!pml4_set_page(current->pml4, va, newpage, writable))
    {
       /* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage); // 심심좌 암살
       return false;
    }
    return true;
@@ -246,7 +251,9 @@ int process_exec(void *f_name)
 
    /* We first kill the current context */
    process_cleanup();
-
+#ifdef VM
+	supplemental_page_table_init(&cur->spt); //심심좌 암살
+#endif
    // for argument parsing
    char *parse[64];
    int count = 0;
@@ -316,13 +323,13 @@ void argument_stack(char **parse, int count, void **rsp)
 }
 
 int process_add_file(struct file *f)
-{
-   struct thread *cur = thread_current();
+{  
 
+   struct thread *cur = thread_current();
    // 파일 객체(struct file)를 가리키는 포인터를 File Descriptor 테이블에 추가
-   lock_acquire(&filesys_lock);
+   // lock_acquire(&filesys_lock);
    cur->fdt[cur->next_fd] = f;
-   lock_release(&filesys_lock);
+   // lock_release(&filesys_lock);
    // 다음 File Descriptor 값 1 증가
    cur->next_fd++;
    // 추가된 파일 객체의 File Descriptor 반환
@@ -380,8 +387,10 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
    struct thread *cur = thread_current();
-   for (int i = 2; i < 64; i++)
+   for (int i = FD_MIN; i < FD_MAX; i++) // 심심좌 암살
       close(i);
+   palloc_free_multiple(cur->fdt, 3); // 심심좌 암살
+	cur->fdt = NULL; //심심좌 암살
    file_close(cur->running_file);
    sema_up(&cur->exit_sema);
    sema_down(&cur->free_sema);
@@ -655,7 +664,14 @@ validate_segment(const struct Phdr *phdr, struct file *file)
    /* It's okay. */
    return true;
 }
+bool install_page(void *upage, void *kpage, bool writable)
+{
+   struct thread *t = thread_current();
 
+   /* Verify that there's not already a page at that virtual
+    * address, then map our page there. */
+   return (pml4_get_page(t->pml4, upage) == NULL && pml4_set_page(t->pml4, upage, kpage, writable));
+}
 #ifndef VM
 /* Codes of this block will be ONLY USED DURING project 2.
  * If you want to implement the function for whole project 2, implement it
@@ -752,15 +768,7 @@ setup_stack(struct intr_frame *if_)
  * with palloc_get_page().
  * Returns true on success, false if UPAGE is already mapped or
  * if memory allocation fails. */
-static bool
-install_page(void *upage, void *kpage, bool writable)
-{
-   struct thread *t = thread_current();
 
-   /* Verify that there's not already a page at that virtual
-    * address, then map our page there. */
-   return (pml4_get_page(t->pml4, upage) == NULL && pml4_set_page(t->pml4, upage, kpage, writable));
-}
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
@@ -771,11 +779,12 @@ install_page(void *upage, void *kpage, bool writable)
 static bool
 lazy_load_segment(struct page *page, void *aux)
 {
+   struct frame *frame_ = page->frame;
    struct aux_struct *aux_ = (struct aux_struct *)aux;
    /* TODO: Load the segment from the file */
    struct file* file = aux_->file;
    off_t ofs = aux_->offset;
-   uint32_t read_bytes = aux_->page_read_bytes;
+   size_t read_bytes = aux_->page_read_bytes;
    bool writable = aux_->writable;
    size_t zero_bytes = PGSIZE - read_bytes;
    
@@ -788,19 +797,13 @@ lazy_load_segment(struct page *page, void *aux)
    file_seek(file,ofs);
    
    /* read_bytes 만큼 읽어오라고했는데 같지않을 경우*/
-   if( file_read(file,page->va,read_bytes) != read_bytes){
+   if( file_read(file,frame_->kva,read_bytes) != read_bytes){
+      palloc_free_page(frame_->kva);
       return false;
    }
 
    /* 다 읽고 나면 0으로 채워줌 */
-   memset( (uint32_t *)page->frame->kva + read_bytes, 0, zero_bytes);
-   
-   // if (!install_page(page->va, kpage, writable))
-   // {
-   //    palloc_free_page(kpage);
-   //    printf("fail\n");
-   //    return false;
-   // }
+   memset(frame_->kva + read_bytes, 0, zero_bytes);
    
    return true;
    /* TODO: This called when the first page fault occurs on address VA. */
@@ -848,13 +851,13 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
        aux 인자로써 보조 값들을 설정할 필요가 있음
        당신은 바이너리 파일을 로드할 때 필수적인 정보를 포함하는 구조체를 생성하는 것이 좋다.*/
 
-      void *aux = NULL;
-      struct aux_struct* aux_struct = malloc(sizeof(struct aux_struct));
-      aux_struct->file= file;
-      aux_struct->offset = ofs;
-      aux_struct->page_read_bytes = page_read_bytes;
-      aux_struct->writable = writable;
-      aux = aux_struct;
+      
+      struct aux_struct* aux = malloc(sizeof(struct aux_struct));
+      aux->file= file;
+      aux->offset = ofs;
+      aux->page_read_bytes = page_read_bytes;
+      aux->writable = writable;
+  
       
       if (!vm_alloc_page_with_initializer(VM_ANON, upage,
                                           writable, lazy_load_segment, aux))
@@ -889,7 +892,7 @@ setup_stack(struct intr_frame *if_)
       success = vm_claim_page(stack_bottom);
       /* vm_alloc_page()를 호출하여 바로 하나의 UNINIT 페이지를 생성 */
       if (success){
-         if_->rsp = USER_STACK; /* 왜 rsp를 USER_STACK 으로 바꿔주지?? */
+         if_->rsp = (uintptr_t)USER_STACK; /* 왜 rsp를 USER_STACK 으로 바꿔주지?? */
       }
    }
    
