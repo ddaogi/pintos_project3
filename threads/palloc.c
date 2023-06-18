@@ -270,7 +270,7 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
 
 	if (page_idx != BITMAP_ERROR)
 		pages = pool->base + PGSIZE * page_idx;
-	else
+	else	 /* 여기서 걸림  */
 		pages = NULL;
 
 	if (pages) {

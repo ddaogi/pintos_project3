@@ -35,7 +35,7 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-void check_address(void *addr);
+struct page* check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 
@@ -70,7 +70,7 @@ void syscall_init(void)
 void syscall_handler(struct intr_frame *f UNUSED)
 {
    // TODO: Your implementation goes here.
-   check_address(f->rsp);
+   // check_address(f->rsp);
    struct thread *cur = thread_current();
    memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
@@ -241,7 +241,8 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 */
 int read(int fd, void *buffer, unsigned size)
 {
-   check_address(buffer);
+
+   check_valid_buffer(buffer,size,1);
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -281,7 +282,9 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
-   check_address(buffer);
+#ifdef VM
+      check_valid_buffer(buffer, size, 0);
+#endif
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -290,17 +293,19 @@ int write(int fd, const void *buffer, unsigned size)
    }
    else if (fd == STDIN_FILENO)
    {
-      return -1;
+      exit(-1);
    }
    else
    {
+      struct file *write_file = process_get_file(fd);
+      if(write_file == NULL)
+         return -1;
       lock_acquire(&filesys_lock);
-      file_size = file_write(process_get_file(fd), buffer, size);
+      file_size = file_write(write_file, buffer, size);
       lock_release(&filesys_lock);
    }
    return file_size;
 }
-
 /*
 open file fd에서 읽거나 쓸 다음 바이트를 position으로 변경합니다.
 position은 파일 시작부터 바이트 단위로 표시됩니다.
@@ -347,15 +352,59 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
-void check_address(void *addr)
+// struct page *check_address(void *addr)
+// {
+//    struct thread *curr = thread_current();
+//    if ( is_kernel_vaddr(addr)){
+      
+      
+//       exit(-1);
+//    }   
+//    struct page* get_page = spt_find_page(&curr->spt, addr);
+//    if(get_page == NULL) {
+//       exit(-1);
+//       }
+//    return get_page;
+// }
+// void check_valid_buffer(void* buffer, unsigned size, bool to_write){
+//     for(char i=0; i<size; i++){
+//         struct page* page = check_address(buffer + i);
+        
+
+//         /* 써야되는데 page->writable이 false? */
+//         if(to_write == true && page->writable == false){
+//             // PANIC(" WOOOOOO %p", page->va);
+//             exit(-1);
+//         }
+//     }
+// }
+
+struct page *check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if ( is_kernel_vaddr(addr) ){
+#ifdef VM
+   struct page *page = spt_find_page(&thread_current()->spt, addr);
+   if (is_kernel_vaddr(addr) || !addr || !page)
+   {
       exit(-1);
-   }   
-   if(spt_find_page(&curr->spt, addr) == NULL)
+   }
+   return page;
+#else
+   if (!is_user_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
+   {
       exit(-1);
-
-   return ;
+   }
+#endif
 }
 
+void check_valid_buffer(void *buffer, unsigned size, bool to_write)
+{
+   for (char i = 0; i <= size; i++)
+   {
+      struct page *page = check_address(buffer + i);
+      if (to_write == false && page->writable == false)
+      {
+         exit(-1);
+      }
+   }
+}
