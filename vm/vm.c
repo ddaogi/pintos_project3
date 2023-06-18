@@ -72,8 +72,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			return false;
 		}
 		/* TODO: Insert the page into the spt. */
-		spt_insert_page(spt, new_page);
-		return true;
+		new_page->writable=writable;
+		return spt_insert_page(spt, new_page);
+		// return true;
 	}
 err:
 	return false;
@@ -98,7 +99,11 @@ spt_find_page (struct supplemental_page_table *spt/*UNUSED*/, void *va /*UNUSED*
 		return NULL;
 	}
 	free(temp_page);
-  	return hash_elem != NULL ? hash_entry (hash_elem, struct page, h_elem) : NULL;
+	if( hash_elem != NULL){
+		return hash_entry (hash_elem, struct page, h_elem);
+	}else
+		return NULL;
+  	// return hash_elem != NULL ? hash_entry (hash_elem, struct page, h_elem) : NULL;
 
 }
 
@@ -185,7 +190,7 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	struct page *page = NULL;
 	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
 	 함수 vm_try_handle_fault를 수정하세요. */
-	
+	if(is_kernel_vaddr(addr)) return false;
 	page = spt_find_page(spt, addr);
 	/* TODO: Validate the fault */
 	/* 진짜 page fault인지, bogus인지 확인하라는 뜻 같음*/
@@ -222,11 +227,14 @@ static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
     /* Set links */
+	if( frame == NULL)
+		return false;
     frame->page = page;
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
 		
-    bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,true);
+    bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,page->writable);
+	
     if (!succ){
 		return false;
 	} 
@@ -271,9 +279,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		/* dst는 thread_current()->spt다  */
 		void* upage = src_p->va;
 		/* dst에 알아서 struct page를 넣어줌 */
-	
-		vm_alloc_page(src_type,upage,true);
-		
+
+		// vm_alloc_page(src_type,upage,src_p->writable);
+		bool success = vm_alloc_page_with_initializer(src_p->uninit.type, src_p->va, src_p->writable,
+													 src_p->uninit.init, src_p->uninit.aux);
+
 		/* upage의 va를 kva에 연결 시켜줌  ( 페이지테이블 등록 )*/
 		vm_claim_page(upage);
 
