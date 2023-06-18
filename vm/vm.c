@@ -216,9 +216,7 @@ vm_claim_page (void *va /*UNUSED*/) {
     struct page *page = NULL;
 	
     page = spt_find_page(&thread_current()->spt,va);
-    
-	/* spt에 찾는 page가 없으면 어떡함? */
-	
+  
 	return vm_do_claim_page (page);
 }
 
@@ -232,8 +230,8 @@ vm_do_claim_page (struct page *page) {
     frame->page = page;
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
-		
-    bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,page->writable);
+    // bool succ = pml4_set_page(thread_current()->pml4,page->va,frame->kva,page->writable);
+	bool succ = (pml4_get_page(thread_current()->pml4, page->va) == NULL) && (pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable));
 	
     if (!succ){
 		return false;
@@ -284,19 +282,26 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		bool success = vm_alloc_page_with_initializer(src_p->uninit.type, src_p->va, src_p->writable,
 													 src_p->uninit.init, src_p->uninit.aux);
 
-		/* upage의 va를 kva에 연결 시켜줌  ( 페이지테이블 등록 )*/
-		vm_claim_page(upage);
+		/* upage의 va를 kva에 연결 시켜줌  ( 페이지테이블 등록이 안되어있을 경우에만)*/
+		struct page *dst_p = spt_find_page(dst,upage);
+		if(src_p -> frame){
+			if(!vm_claim_page(upage)) return false;
+			memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE);
+		}
+		
+			
+
+		/* page에 frame이 연결되어있지 않을경우 */
 
 		/* spt에서 upage의 page를 찾음 */
-		struct page *dst_p = spt_find_page(dst,upage);
-		dst_p->writable = src_p->writable;
-		dst_p->read_bytes = src_p->read_bytes;
-		dst_p->offset = src_p->offset;
-		dst_p->m_file = src_p->m_file;
-		dst_p->operations = src_p ->operations;
+		// dst_p->writable = src_p->writable;
+		// dst_p->read_bytes = src_p->read_bytes;
+		// dst_p->offset = src_p->offset;
+		// dst_p->m_file = src_p->m_file;
+		// dst_p->operations = src_p ->operations;
 		
 		/* 물리메모리 정보 복사 */
-		memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE);
+
 		/* 복사를 해준다ㅡ*/
 		/* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
 	}

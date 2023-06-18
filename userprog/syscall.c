@@ -352,35 +352,11 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
-// struct page *check_address(void *addr)
-// {
-//    struct thread *curr = thread_current();
-//    if ( is_kernel_vaddr(addr)){
-      
-      
-//       exit(-1);
-//    }   
-//    struct page* get_page = spt_find_page(&curr->spt, addr);
-//    if(get_page == NULL) {
-//       exit(-1);
-//       }
-//    return get_page;
-// }
-// void check_valid_buffer(void* buffer, unsigned size, bool to_write){
-//     for(char i=0; i<size; i++){
-//         struct page* page = check_address(buffer + i);
-        
 
-//         /* 써야되는데 page->writable이 false? */
-//         if(to_write == true && page->writable == false){
-//             // PANIC(" WOOOOOO %p", page->va);
-//             exit(-1);
-//         }
-//     }
-// }
 
 struct page *check_address(void *addr)
 {
+   if(addr==NULL) exit(-1);
    struct thread *curr = thread_current();
 #ifdef VM
    struct page *page = spt_find_page(&thread_current()->spt, addr);
