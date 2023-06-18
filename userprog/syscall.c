@@ -16,10 +16,10 @@
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include <string.h>
+#include "vm/vm.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-void check_address(void *addr);
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
 void exit(int status);
@@ -229,7 +229,6 @@ fd(첫 번째 인자)로서 열려 있는 파일의 크기가 몇 바이트인�
 */
 int filesize(int fd)
 {
-
    struct file *find_file = process_get_file(fd);
    if (find_file == NULL)
       return -1;
@@ -282,6 +281,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+   check_address(buffer);
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -350,10 +350,12 @@ void close(int fd)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if ( is_kernel_vaddr(addr)){
+   if ( is_kernel_vaddr(addr) ){
       exit(-1);
-   } else if(pml4_get_page(curr->pml4, addr) == NULL){
+   }   
+   if(spt_find_page(&curr->spt, addr) == NULL)
       exit(-1);
-   }
 
+   return ;
 }
+
