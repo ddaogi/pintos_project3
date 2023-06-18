@@ -96,7 +96,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
-	struct hash hash_vm;
+	struct hash* hash_vm;
 };
 
 #include "threads/thread.h"

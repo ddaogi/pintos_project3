@@ -92,7 +92,7 @@ spt_find_page (struct supplemental_page_table *spt/*UNUSED*/, void *va /*UNUSED*
   	struct hash_elem *hash_elem;
 
   	temp_page->va = pg_round_down(va);
-  	hash_elem = hash_find (&spt->hash_vm, &temp_page->h_elem);
+  	hash_elem = hash_find (spt->hash_vm, &temp_page->h_elem);
 	if (hash_elem == NULL) {
 		free(temp_page);
 		return NULL;
@@ -110,7 +110,7 @@ spt_insert_page (struct supplemental_page_table *spt /*UNUSED*/,
 		struct page *page /*UNUSED*/) {
 	// int succ = false;
 	/* TODO: Fill this function. */
-	struct hash_elem *insert_elem = hash_insert(&spt->hash_vm, &page->h_elem);
+	struct hash_elem *insert_elem = hash_insert(spt->hash_vm, &page->h_elem);
 	if(insert_elem == NULL){
 		return true;
 	}
@@ -241,7 +241,8 @@ vm_do_claim_page (struct page *page) {
 	process.c의 __do_fork로 자식 프로세스가 생성될 때 위의 함수가 호출됩니다.*/
 void
 supplemental_page_table_init (struct supplemental_page_table *spt ) {
-	hash_init(&spt->hash_vm,page_hash,page_less,NULL);
+	spt->hash_vm = malloc(sizeof(struct hash));
+	hash_init(spt->hash_vm,page_hash,page_less,NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -262,7 +263,7 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		struct supplemental_page_table *src /*UNUSED*/) {
 	struct hash_iterator i;
-	hash_first(&i,&src->hash_vm);
+	hash_first(&i,src->hash_vm);
 	while(hash_next(&i)){
 		struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
 		enum vm_type src_type = page_get_type(src_p);
@@ -310,14 +311,14 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// 	enum vm_type src_type = page_get_type(src_p);
 	// }
 	struct hash_iterator i;
-	hash_first(&i,&spt->hash_vm);
+	hash_first(&i,spt->hash_vm);
 	while(hash_next(&i)){
 		struct page *page = hash_entry(hash_cur(&i), struct page ,h_elem);
 		destroy(page);
 	}
-	hash_init(&spt->hash_vm,page_hash,page_less,NULL);
+	hash_init(spt->hash_vm,page_hash,page_less,NULL);
 
-	// hash_destroy(&spt->hash_vm, page_in_hash_free);
+	// hash_destroy(spt->hash_vm, NULL);
 
 }
 
