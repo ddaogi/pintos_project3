@@ -65,10 +65,8 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		
 		struct page *new_page = (struct page*)malloc(sizeof(struct page));
 		if(type == VM_ANON){
-			// init = anon_initializer;
 			uninit_new(new_page,upage,init,type,aux,anon_initializer);
 		}else if(type == VM_FILE){
-			// init = file_backed_initializer;
 			uninit_new(new_page,upage,init,type,aux,file_backed_initializer);
 		}else{
 			return false;
@@ -185,18 +183,10 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-
-
 	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
 	 함수 vm_try_handle_fault를 수정하세요. */
 	
 	page = spt_find_page(spt, addr);
-	
-	// if(page == NULL)
-	// 	PANIC("STOP");
-	
-
-
 	/* TODO: Validate the fault */
 	/* 진짜 page fault인지, bogus인지 확인하라는 뜻 같음*/
 
@@ -204,9 +194,7 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	/* stack growth 함수를 호출해야함? */
 
 	bool ret = vm_do_claim_page(page);
-	//PANIC("woohyun22"); /*이게 안나옴*/
 	return ret;
-	// return vm_do_claim_page (page);
 }
 
 /* Free the page.
@@ -279,35 +267,66 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
 		enum vm_type src_type = page_get_type(src_p);
 	
-		// if( src_type != VM_UNINIT ){
-			/* dst는 thread_current()->spt다  */
+		/* dst는 thread_current()->spt다  */
 		void* upage = src_p->va;
 		/* dst에 알아서 struct page를 넣어줌 */
+	
 		vm_alloc_page(src_type,upage,true);
-
+		
+		/* upage의 va를 kva에 연결 시켜줌  ( 페이지테이블 등록 )*/
 		vm_claim_page(upage);
+
+		/* spt에서 upage의 page를 찾음 */
 		struct page *dst_p = spt_find_page(dst,upage);
 		dst_p->writable = src_p->writable;
 		dst_p->read_bytes = src_p->read_bytes;
 		dst_p->offset = src_p->offset;
+		dst_p->m_file = src_p->m_file;
+		dst_p->operations = src_p ->operations;
+		
+		/* 물리메모리 정보 복사 */
 		memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE);
-		// }
-
 		/* 복사를 해준다ㅡ*/
-		 /* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
+		/* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
 	}
-
 	return true;
-
-	
-	
 }
+
 
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
-	/* TODO: Destroy all the supplemental_page_table hold by thread and
-	 * TODO: writeback all the modified contents to the storage. */
+	/* TODO: Destroy all the supplemental_page_table hold by thread an
+	 * TODO: writeback all the modified contents to the storage. 
+	supplemental page table에 의해 유지되던 모든 자원들을 free
+	process가 exit할 때(userprog/process.c의 process_exit()) 호출됩니다.
+	페이지 엔트리를 반복하면서 테이블의 페이지에 destroy(page)를 호출해야함
+	실제 페이지 테이블(pml4)와 물리 주소(palloc된 메모리)에 대해 걱정할 필요가 없다.
+	supplemental page table이 정리되어지고 나서, 호출자가 그것들을 정리할 것입니다.*/
+	// struct hash_iterator i;
+	// hash_first(&i,&src->hash_vm);
+	// while(hash_next(&i)){
+	// 	struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
+	// 	enum vm_type src_type = page_get_type(src_p);
+	// }
+	struct hash_iterator i;
+	hash_first(&i,&spt->hash_vm);
+	while(hash_next(&i)){
+		struct page *page = hash_entry(hash_cur(&i), struct page ,h_elem);
+		destroy(page);
+	}
+	hash_init(&spt->hash_vm,page_hash,page_less,NULL);
+
+	// hash_destroy(&spt->hash_vm, page_in_hash_free);
+
+}
+
+/* hash_destory에 들어갈estructor */
+void page_in_hash_free(struct hash_elem *hash_elem, void* aux){
+	
+	struct page* get_page = hash_entry(hash_elem, struct page ,h_elem);
+	vm_dealloc_page(get_page);
+
 }
 
 unsigned page_hash( const struct hash_elem *p_, void *aux){

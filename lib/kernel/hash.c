@@ -51,19 +51,21 @@ hash_init (struct hash *h,
    hash_replace(), or hash_delete(), yields undefined behavior,
    whether done in DESTRUCTOR or elsewhere. */
 void
+
+/*BUCKET이 비어있어서,  WHILE문을 안들어가는 오류 WOOO*/
 hash_clear (struct hash *h, hash_action_func *destructor) {
 	size_t i;
-
+	
 	for (i = 0; i < h->bucket_cnt; i++) {
 		struct list *bucket = &h->buckets[i];
-
-		if (destructor != NULL)
+		if (destructor != NULL){
 			while (!list_empty (bucket)) {
+				PANIC("WOPOOOOO");
 				struct list_elem *list_elem = list_pop_front (bucket);
 				struct hash_elem *hash_elem = list_elem_to_hash_elem (list_elem);
 				destructor (hash_elem, h->aux);
 			}
-
+		}
 		list_init (bucket);
 	}
 

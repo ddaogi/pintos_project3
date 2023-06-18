@@ -130,5 +130,5 @@ struct aux_struct{
 
 unsigned page_hash (const struct hash_elem *, void *);
 bool page_less (const struct hash_elem *, const struct hash_elem *, void *);
-
+void page_in_hash_free(struct hash_elem *hash_elem, void* aux);
 #endif  /* VM_VM_H */
