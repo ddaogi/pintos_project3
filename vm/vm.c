@@ -290,6 +290,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		/* 복사를 해준다ㅡ*/
 		/* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
 	}
+	
+	
 	return true;
 }
 
@@ -318,7 +320,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	}
 	hash_init(spt->hash_vm,page_hash,page_less,NULL);
 
-	// hash_destroy(spt->hash_vm, NULL);
+	// free(spt->hash_vm);
 
 }
 
