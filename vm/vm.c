@@ -174,6 +174,10 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr UNUSED) {
 	/* PAGE 만큼 낮춰야한다.. */
+	void* new_stack_bottom= pg_round_down(addr);
+   	if(vm_alloc_page(VM_ANON, new_stack_bottom, true)){ 
+		vm_claim_page(new_stack_bottom);
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -193,15 +197,26 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
 	 함수 vm_try_handle_fault를 수정하세요. */
 	if(is_kernel_vaddr(addr)) return false;
+	
+	/* 할당되지 않은 공간에 접근할 때 */
+	
+	// if(!spt_find_page(spt,f->rsp) && user){
+	// 	vm_stack_growth(f->rsp);
+	// 	return true;
+	// }
+
 	page = spt_find_page(spt, addr);
-	/* TODO: Validate the fault */
-	/* 진짜 page fault인지, bogus인지 확인하라는 뜻 같음*/
-
-	/* TODO: Your code goes here */
-	/* stack growth 함수를 호출해야함? */
-
-	bool ret = vm_do_claim_page(page);
-	return ret;
+	/* 유저가 호출하고, 페이지가 없고, 주소값이 스택영역에 해당될 경우 */
+	if( user && !page && addr < USER_STACK && addr >= (USER_STACK-0x100000)/*  && (addr > (f->rsp-PGSIZE)) */){
+		if( addr <= (f->rsp-PGSIZE))
+			exit(-1);
+		vm_stack_growth(addr);
+		return true;
+	}
+	else{
+		bool ret = vm_do_claim_page(page);
+		return ret;
+	}
 }
 
 /* Free the page.

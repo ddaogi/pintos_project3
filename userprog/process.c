@@ -602,7 +602,6 @@ load(const char *file_name, struct intr_frame *if_)
 
    /* Set up stack. */
    if (!setup_stack(if_)){
-      /* 실패했으니까 들어오지 */
       goto done;
    }
 
@@ -893,6 +892,7 @@ setup_stack(struct intr_frame *if_)
       /* vm_alloc_page()를 호출하여 바로 하나의 UNINIT 페이지를 생성 */
       if (success){
          if_->rsp = (uintptr_t)USER_STACK; /* 왜 rsp를 USER_STACK 으로 바꿔주지?? */
+         thread_current()->rsp = USER_STACK;
       }
    }
    
