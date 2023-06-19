@@ -339,7 +339,8 @@ int process_add_file(struct file *f)
 struct file *process_get_file(int fd)
 {
    struct thread *cur = thread_current();
-   if (fd < FD_MIN || fd >= FD_MAX)
+   
+   if (fd < FD_MIN || fd >= 128)
    {
       return NULL;
    }
@@ -775,10 +776,12 @@ setup_stack(struct intr_frame *if_)
 
 
 /* 우영우 코드 */
-static bool
+bool
 lazy_load_segment(struct page *page, void *aux)
 {
+   
    struct frame *frame_ = page->frame;
+
    struct aux_struct *aux_ = (struct aux_struct *)aux;
    /* TODO: Load the segment from the file */
    struct file* file = aux_->file;

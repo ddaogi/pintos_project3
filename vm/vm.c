@@ -75,7 +75,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* TODO: Insert the page into the spt. */
 		new_page->writable=writable;
 		return spt_insert_page(spt, new_page);
-		// return true;
 	}
 err:
 	return false;
@@ -190,14 +189,16 @@ bool
 vm_try_handle_fault (struct intr_frame *f , void *addr,
 		bool user , bool write, bool not_present ) {
 	/* addr은 page_fault에서 보낸 fault address */
-	if(addr == NULL)
-		exit(-1);
+	if(addr == NULL || is_kernel_vaddr(addr) || addr == 0x04000000){
+		return false;
+	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
 	 함수 vm_try_handle_fault를 수정하세요. */
-	if(is_kernel_vaddr(addr)) return false;
 	
+	/* not present 가 false면 readonly 페이지에 write 하려는 상황*/
+
 	/* 할당되지 않은 공간에 접근할 때 */
 	
 	// if(!spt_find_page(spt,f->rsp) && user){

@@ -1,6 +1,8 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "userprog/process.h"
+#include "threads/vaddr.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -46,13 +48,37 @@ file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 }
 
-/* Do the mmap */
+/* Do the mmap 
+*/
 void *
-do_mmap (void *addr, size_t length, int writable,
-		struct file *file, off_t offset) {
+do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
+	
+	uint32_t read_bytes = length;
+	uint32_t zero_bytes = read_bytes % PGSIZE;
+	void* init_addr = addr;
+	void* upage = addr;
+	while(read_bytes >0 || zero_bytes >0){
+		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+		struct aux_struct* aux = malloc(sizeof(struct aux_struct));
+		aux->file = file;
+		aux->offset = offset;
+		aux->page_read_bytes = page_read_bytes;
+		aux->writable = writable;
+		
+		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);
+			
+		read_bytes -= page_read_bytes;
+      	zero_bytes -= page_zero_bytes;
+      	offset+= page_read_bytes;
+      	upage += PGSIZE;
+	}
+	return init_addr;
 }
 
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+
 }
