@@ -186,7 +186,8 @@ bool
 vm_try_handle_fault (struct intr_frame *f , void *addr,
 		bool user , bool write, bool not_present ) {
 	/* addr은 page_fault에서 보낸 fault address */
-
+	if(addr == NULL)
+		exit(-1);
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
@@ -235,7 +236,8 @@ vm_do_claim_page (struct page *page) {
     page->frame = frame;
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
 	
-    bool succ = install_page(page->va,frame->kva,page->writable);
+    // bool succ = install_page(page->va,frame->kva,page->writable);
+	bool succ = (pml4_get_page(thread_current()->pml4, page->va) == NULL && pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable));
 	
     if (!succ){
 		return false;
@@ -289,12 +291,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		struct page *dst_p = spt_find_page(dst,upage);
 		if (src_p ->frame){
 			if(!vm_do_claim_page(dst_p)) return false;
-			memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE);
-
-		}		
-		/* 물리메모리 정보 복사 */
-		/* 복사를 해준다ㅡ*/
-		/* 초기화되지않은(uninit) 페이지를 즉시 할당하고, 그 페이지들을 바로 요청(claim)해야함 */
+			memcpy(dst_p->frame->kva,src_p->frame->kva,PGSIZE); /*물리메모리 정보 복사*/
+		}
 	}
 	return true;
 }
@@ -314,22 +312,22 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// 	struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
 	// 	enum vm_type src_type = page_get_type(src_p);
 	// }
-	struct hash_iterator i;
+	/* struct hash_iterator i;
 	hash_first(&i,spt->hash_vm);
 	while(hash_next(&i)){
 		struct page *page = hash_entry(hash_cur(&i), struct page ,h_elem);
 		destroy(page);
 	}
-	hash_init(spt->hash_vm,page_hash,page_less,NULL);
+	hash_init(spt->hash_vm,page_hash,page_less,NULL); */
+
+	hash_destroy(spt->hash_vm, page_in_hash_free);
 }
 
 
 /* hash_destory에 들어갈estructor */
 void page_in_hash_free(struct hash_elem *hash_elem, void* aux){
-	
 	struct page* get_page = hash_entry(hash_elem, struct page ,h_elem);
 	vm_dealloc_page(get_page);
-
 }
 
 unsigned page_hash( const struct hash_elem *p_, void *aux){

@@ -252,8 +252,9 @@ int process_exec(void *f_name)
    /* We first kill the current context */
    process_cleanup();
 #ifdef VM
-	supplemental_page_table_init(&cur->spt); //심심좌 암살
+	supplemental_page_table_init(&cur->spt);
 #endif
+
    // for argument parsing
    char *parse[64];
    int count = 0;
@@ -270,12 +271,11 @@ int process_exec(void *f_name)
 
    /* And then load the binary */
    success = load(file_name, &_if);
-
    /* If load failed, quit. */
    if (!success)
    {
       palloc_free_page(file_name);
-      return -1;
+      exit(-1);
    }
 
    argument_stack(parse, count, &_if.rsp);
@@ -664,6 +664,11 @@ validate_segment(const struct Phdr *phdr, struct file *file)
    /* It's okay. */
    return true;
 }
+#ifndef VM
+/* Codes of this block will be ONLY USED DURING project 2.
+ * If you want to implement the function for whole project 2, implement it
+ * outside of #ifndef macro. */
+
 bool install_page(void *upage, void *kpage, bool writable)
 {
    struct thread *t = thread_current();
@@ -672,11 +677,6 @@ bool install_page(void *upage, void *kpage, bool writable)
     * address, then map our page there. */
    return (pml4_get_page(t->pml4, upage) == NULL && pml4_set_page(t->pml4, upage, kpage, writable));
 }
-#ifndef VM
-/* Codes of this block will be ONLY USED DURING project 2.
- * If you want to implement the function for whole project 2, implement it
- * outside of #ifndef macro. */
-
 /* load() helpers. */
 static bool install_page(void *upage, void *kpage, bool writable);
 
@@ -901,7 +901,6 @@ setup_stack(struct intr_frame *if_)
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
    /* TODO: Your code goes here */
-   
    return success;
 }
 #endif /* VM */

@@ -180,6 +180,7 @@ pid_t fork(const char *thread_name)
 */
 int exec(const char *cmd_line)
 {
+   check_address(cmd_line);
    char *fn_copy;
    tid_t tid;
 
@@ -354,9 +355,9 @@ struct page *check_address(void *addr)
 {
    struct thread *curr = thread_current();
 #ifdef VM
-   if (addr ==NULL) exit(-1);
+   if (addr == NULL) exit(-1);
    struct page *page = spt_find_page(&thread_current()->spt, addr);
-   if (is_kernel_vaddr(addr) || !addr || !page)
+   if (is_kernel_vaddr(addr) || !page)
    {
       exit(-1);
    }
