@@ -391,7 +391,17 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write)
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
    
    struct file* get_file = process_get_file(fd);
+   // PANIC(" addr = %llu, length = %llu  sum = %llu \n\n",addr,length , addr+length);
+   if(is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0) 
+      return NULL;
 
+   // PANIC("file length %d , offset %d\n\n", file_length(get_file),offset);
+   if( offset > PGSIZE){
+      return NULL;
+   }
+   if(!get_file){
+      exit(-1);
+   }
    return do_mmap(addr,length,writable,get_file,offset);
 
 }

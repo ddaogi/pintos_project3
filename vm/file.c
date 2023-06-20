@@ -53,24 +53,32 @@ file_backed_destroy (struct page *page) {
 void *
 do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
 	
-	uint32_t read_bytes = length;
-	uint32_t zero_bytes = read_bytes % PGSIZE;
+	struct file *re_file = file_reopen(file);
+	// uint32_t read_bytes = file_length(re_file);
+	uint32_t read_bytes = file_length(re_file);
+	// uint32_t zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE) - read_bytes);
+
+	// uint32_t zero_bytes = read_bytes % PGSIZE;
 	void* init_addr = addr;
 	void* upage = addr;
-	while(read_bytes >0 || zero_bytes >0){
+	int count =0;
+	
+	while(read_bytes >0 /* || zero_bytes >0 */){
+		count ++;
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      	size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		struct aux_struct* aux = malloc(sizeof(struct aux_struct));
-		aux->file = file;
+		aux->file = re_file;
 		aux->offset = offset;
 		aux->page_read_bytes = page_read_bytes;
-		aux->writable = writable;
+      	// size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
-		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);
-			
+		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);	
+		struct page* temp_p = upage;
+		
+		// vm_claim_page(upage);
 		read_bytes -= page_read_bytes;
-      	zero_bytes -= page_zero_bytes;
+      	// zero_bytes -= page_zero_bytes;
       	offset+= page_read_bytes;
       	upage += PGSIZE;
 	}
@@ -80,5 +88,16 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 /* Do the munmap */
 void
 do_munmap (void *addr) {
-
+	while(true){
+		
+		struct page * temp_p = spt_find_page(&thread_current()->spt,addr);
+    	if (temp_p == NULL) {
+    		return NULL;
+    	}
+		struct aux_struct* container = temp_p->uninit.aux;
+		file_open(container->file);
+		file_write_at(container->file, addr, container->page_read_bytes, container->offset);	
+		file_close(container->file);
+		addr+= PGSIZE;
+	}
 }

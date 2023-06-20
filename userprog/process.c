@@ -779,12 +779,11 @@ setup_stack(struct intr_frame *if_)
 bool
 lazy_load_segment(struct page *page, void *aux)
 {
-   
    struct frame *frame_ = page->frame;
-
    struct aux_struct *aux_ = (struct aux_struct *)aux;
    /* TODO: Load the segment from the file */
    struct file* file = aux_->file;
+   
    off_t ofs = aux_->offset;
    size_t read_bytes = aux_->page_read_bytes;
    bool writable = aux_->writable;
@@ -803,7 +802,7 @@ lazy_load_segment(struct page *page, void *aux)
       palloc_free_page(frame_->kva);
       return false;
    }
-
+   // printf("page = %p, frame = %p \n", page->va, frame_->kva);
    /* 다 읽고 나면 0으로 채워줌 */
    memset(frame_->kva + read_bytes, 0, zero_bytes);
    
@@ -853,7 +852,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
        aux 인자로써 보조 값들을 설정할 필요가 있음
        당신은 바이너리 파일을 로드할 때 필수적인 정보를 포함하는 구조체를 생성하는 것이 좋다.*/
 
-      
+      // printf("zero_bytes = %d, read_bytes = %d\n\n", zero_bytes,read_bytes);
       struct aux_struct* aux = malloc(sizeof(struct aux_struct));
       aux->file= file;
       aux->offset = ofs;

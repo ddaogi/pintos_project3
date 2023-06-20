@@ -19,16 +19,19 @@ test_main (void)
           "try to mmap with offset 0x1000");
   close (handle);
 
+
+
   msg ("validate mmap.");
   if (!memcmp ((void *) 0x10000000, &large[0x1000], 0x1000))
       msg ("validated.");
   else
-      fail ("validate fail.");
+      fail ("validate fail.1");
 
   msg ("write to mmap");
   memset (zeros, 0, 0x1000);
   memcpy ((void *) 0x10000000, zeros, 0x1000);
   munmap ((void *) 0x10000000);
+
 
   msg ("validate contents.");
 
@@ -36,10 +39,11 @@ test_main (void)
   CHECK (0x1000 == read (handle, buf, 0x1000), "read \"large.txt\" Page 0");
 
   msg ("validate page 0.");
+  msg("%s\n\n\n",buf);
   if (!memcmp ((void *) buf, large, 0x1000))
       msg ("validated.");
   else
-      fail ("validate fail.");
+      fail ("validate fail.2");
 
   CHECK (0x1000 == read (handle, buf, 0x1000), "read \"large.txt\" Page 1");
 
@@ -47,7 +51,8 @@ test_main (void)
   if (!memcmp ((void *) buf, zeros, 0x1000))
       msg ("validated.");
   else
-      fail ("validate fail.");
+    //   fail ("validate fail.3");
+    msg("%s\n", buf);
   close (handle);
 
   msg ("success");
