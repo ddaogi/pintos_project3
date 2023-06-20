@@ -392,7 +392,8 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
    
    struct file* get_file = process_get_file(fd);
    // PANIC(" addr = %llu, length = %llu  sum = %llu \n\n",addr,length , addr+length);
-   if(is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0) 
+
+   if( length ==0 || is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0 ) 
       return NULL;
 
    // PANIC("file length %d , offset %d\n\n", file_length(get_file),offset);

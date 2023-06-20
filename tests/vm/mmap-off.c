@@ -39,7 +39,6 @@ test_main (void)
   CHECK (0x1000 == read (handle, buf, 0x1000), "read \"large.txt\" Page 0");
 
   msg ("validate page 0.");
-  msg("%s\n\n\n",buf);
   if (!memcmp ((void *) buf, large, 0x1000))
       msg ("validated.");
   else
@@ -51,8 +50,7 @@ test_main (void)
   if (!memcmp ((void *) buf, zeros, 0x1000))
       msg ("validated.");
   else
-    //   fail ("validate fail.3");
-    msg("%s\n", buf);
+      fail ("validate fail.3");
   close (handle);
 
   msg ("success");
