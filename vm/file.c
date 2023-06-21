@@ -3,6 +3,7 @@
 #include "vm/vm.h"
 #include "userprog/process.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -56,15 +57,12 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 	struct file *re_file = file_reopen(file);
 	// uint32_t read_bytes = file_length(re_file);
 	uint32_t read_bytes = file_length(re_file);
-	// uint32_t zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE) - read_bytes);
 
-	// uint32_t zero_bytes = read_bytes % PGSIZE;
 	void* init_addr = addr;
 	void* upage = addr;
-	int count =0;
-	
+		
 	while(read_bytes >0 /* || zero_bytes >0 */){
-		count ++;
+		
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 
 		struct aux_struct* aux = malloc(sizeof(struct aux_struct));
@@ -73,7 +71,7 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 		aux->page_read_bytes = page_read_bytes;
       	// size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
-		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);	
+		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);
 		// vm_claim_page(upage);
 		read_bytes -= page_read_bytes;
       	// zero_bytes -= page_zero_bytes;
@@ -86,17 +84,24 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 /* Do the munmap */
 void
 do_munmap (void *addr) {
-	while(true){
-		
-		struct page * temp_p = spt_find_page(&thread_current()->spt,addr);
-    	if (temp_p == NULL) {
-    		return NULL;
-    	}
-		struct aux_struct* container = temp_p->uninit.aux;
-		if(container->file == NULL) return;
-		file_reopen(container->file);
-		file_write_at(container->file, addr, container->page_read_bytes, container->offset);	
-		file_close(container->file);
-		addr+= PGSIZE;
+	struct page * temp_p = spt_find_page(&thread_current()->spt,addr);
+    while(true){
+        temp_p = spt_find_page(&thread_current()->spt,addr);
+        if (temp_p == NULL) {
+            return NULL;
+        }
+        struct aux_struct* container = temp_p->uninit.aux;
+        if(container->file == NULL) return;
+        // file_reopen(container->file);
+        if(pml4_is_dirty(thread_current()->pml4,addr)){
+			lock_acquire(&filesys_lock);
+			file_seek(container->file, container->offset);
+            file_write_at(container->file, addr, container->page_read_bytes, container->offset);
+			lock_release(&filesys_lock);
+        }
+        // file_close(container->file);
+        pml4_clear_page(thread_current()->pml4,addr);
+        addr+= PGSIZE;
 	}
+	file_close(temp_p->m_file);
 }

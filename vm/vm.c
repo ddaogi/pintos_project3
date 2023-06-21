@@ -190,6 +190,8 @@ bool
 vm_try_handle_fault (struct intr_frame *f , void *addr,
 		bool user , bool write, bool not_present ) {
 	/* addr은 page_fault에서 보낸 fault address */
+	if(!not_present)
+		exit(-1);
 	if(addr == NULL || is_kernel_vaddr(addr) || addr == 0x04000000){
 		return false;
 	}
