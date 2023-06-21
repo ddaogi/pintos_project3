@@ -10,6 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/file.h"
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -307,7 +308,7 @@ tid_t thread_tid(void)
 void thread_exit(void)
 {
    ASSERT(!intr_context());
-
+   
 #ifdef USERPROG
    process_exit();
 #endif

@@ -69,14 +69,17 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 		aux->file = re_file;
 		aux->offset = offset;
 		aux->page_read_bytes = page_read_bytes;
+		aux->init_addr = init_addr;
       	// size_t page_zero_bytes = PGSIZE - page_read_bytes;
 		
 		vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux);
+		
 		// vm_claim_page(upage);
 		read_bytes -= page_read_bytes;
       	// zero_bytes -= page_zero_bytes;
       	offset+= page_read_bytes;
       	upage += PGSIZE;
+	
 	}
 	return init_addr;
 }
@@ -84,24 +87,26 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 /* Do the munmap */
 void
 do_munmap (void *addr) {
-	struct page * temp_p = spt_find_page(&thread_current()->spt,addr);
+	struct file *return_file ;
     while(true){
-        temp_p = spt_find_page(&thread_current()->spt,addr);
+        struct page* temp_p = spt_find_page(&thread_current()->spt,addr);
         if (temp_p == NULL) {
-            return NULL;
+            return;
         }
         struct aux_struct* container = temp_p->uninit.aux;
         if(container->file == NULL) return;
         // file_reopen(container->file);
+		return_file = container->file;
         if(pml4_is_dirty(thread_current()->pml4,addr)){
 			lock_acquire(&filesys_lock);
 			file_seek(container->file, container->offset);
             file_write_at(container->file, addr, container->page_read_bytes, container->offset);
 			lock_release(&filesys_lock);
+			pml4_set_dirty(thread_current()->pml4,addr,0);
+        	// pml4_clear_page(thread_current()->pml4,addr);
         }
         // file_close(container->file);
-        pml4_clear_page(thread_current()->pml4,addr);
         addr+= PGSIZE;
 	}
-	file_close(temp_p->m_file);
+	// file_close(return_file);
 }

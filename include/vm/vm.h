@@ -57,6 +57,7 @@ struct page {
 	size_t zero_bytes;     /* 0으로 채울 남은 페이지의 바이트 */
 
 	struct hash_elem h_elem;
+	void* init_address;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -126,6 +127,7 @@ struct aux_struct{
 	off_t offset;
 	uint32_t page_read_bytes;
 	bool writable;
+	void* init_addr;
 };
 
 unsigned page_hash (const struct hash_elem *, void *);

@@ -73,8 +73,10 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			return false;
 		}
 		/* TODO: Insert the page into the spt. */
+		struct aux_struct* aux_ = aux;
 		new_page->writable=writable;
-		
+		if( type == VM_FILE)
+			new_page->init_address = aux_->init_addr;
 		return spt_insert_page(spt, new_page);
 	}
 err:
@@ -333,21 +335,39 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// 	struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
 	// 	enum vm_type src_type = page_get_type(src_p);
 	// }
-	/* struct hash_iterator i;
+	if(spt == NULL) return;
+	if(spt->hash_vm == NULL) return;
+	struct hash_iterator i;
 	hash_first(&i,spt->hash_vm);
 	while(hash_next(&i)){
 		struct page *page = hash_entry(hash_cur(&i), struct page ,h_elem);
-		destroy(page);
+		// do_munmap(page->va);
+		
+		// if(page_get_type(0x10000000) == VM_UNINIT){	
+		// 	PANIC("page get type = %d\n\n",page_get_type(0x10000000));
+		// }	
+		if(page_get_type(page) == VM_FILE)
+			do_munmap(page->va);
 	}
-	hash_init(spt->hash_vm,page_hash,page_less,NULL); */
+	// struct thread* cur = thread_current();
+	// for (int i = FD_MIN; i < FD_MAX; i++) // 심심좌 암살
+    //   close(i);
+   	// palloc_free_multiple(cur->fdt, 3); // 심심좌 암살
+   	// cur->fdt = NULL;                   // 심심좌 암살
+   	// file_close(cur->running_file);
 
-	hash_destroy(spt->hash_vm, page_in_hash_free);
+	// hash_init(spt->hash_vm,page_hash,page_less,NULL); 
+	
+	// hash_destroy(spt->hash_vm, page_in_hash_free);
 }
 
 
 /* hash_destory에 들어갈estructor */
 void page_in_hash_free(struct hash_elem *hash_elem, void* aux){
 	struct page* get_page = hash_entry(hash_elem, struct page ,h_elem);
+	// if(page_get_type(get_page) == VM_FILE){
+	// 	do_munmap(get_page);
+	// }
 	vm_dealloc_page(get_page);
 }
 
