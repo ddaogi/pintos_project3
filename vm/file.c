@@ -61,10 +61,8 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 	// uint32_t zero_bytes = read_bytes % PGSIZE;
 	void* init_addr = addr;
 	void* upage = addr;
-	int count =0;
 	
 	while(read_bytes >0 /* || zero_bytes >0 */){
-		count ++;
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 
 		struct aux_struct* aux = malloc(sizeof(struct aux_struct));
@@ -95,7 +93,10 @@ do_munmap (void *addr) {
     		return NULL;
     	}
 		struct aux_struct* container = temp_p->uninit.aux;
-		file_open(container->file);
+		if(container->file == NULL) {
+			return;
+		}
+		file_reopen(container->file);
 		file_write_at(container->file, addr, container->page_read_bytes, container->offset);	
 		file_close(container->file);
 		addr+= PGSIZE;

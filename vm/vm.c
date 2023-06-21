@@ -206,8 +206,13 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	// 	vm_stack_growth(f->rsp);
 	// 	return true;
 	// }
-
+	if(!not_present) {
+		exit(-1);
+	}
 	page = spt_find_page(spt, addr);
+	if(!page && !user) {
+		exit(-1);
+	}
 	/* 유저가 호출하고, 페이지가 없고, 주소값이 스택영역에 해당될 경우 */
 	if( user && !page && addr < USER_STACK && addr >= (USER_STACK-0x100000)/*  && (addr > (f->rsp-PGSIZE)) */){
 		if( addr <= (f->rsp-PGSIZE))

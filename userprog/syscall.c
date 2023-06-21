@@ -290,6 +290,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+
 #ifdef VM
       check_valid_buffer(buffer, size, 0);
 #endif
@@ -381,7 +382,7 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write)
    for (char i = 0; i <= size; i++)
    {
       struct page *page = check_address(buffer + i);
-      if (to_write == false && page->writable == false)
+      if (to_write == true && page->writable == false)
       {
          exit(-1);
       }
@@ -391,15 +392,20 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write)
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
    
    struct file* get_file = process_get_file(fd);
-   // PANIC(" addr = %llu, length = %llu  sum = %llu \n\n",addr,length , addr+length);
-   if(is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0) 
+   //스택의 제일 아래(USERSTACK에서 1MB를 뺸 값)
+   static void *STACK_MINIMUM_ADDR = USER_STACK - (1<<20);
+   
+   if(length == 0 || is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0 || (uintptr_t)addr % PGSIZE != 0
+      || (addr > STACK_MINIMUM_ADDR && addr < USER_STACK) || addr < 0x6050c0) 
       return NULL;
-
-   // PANIC("file length %d , offset %d\n\n", file_length(get_file),offset);
-   if( offset > PGSIZE){
+   
+   // if(addr > STACK_MINIMUM_ADDR && addr > 0X6050c0) {
+   //    return NULL;
+   // }
+   if(offset > PGSIZE){
       return NULL;
    }
-   if(!get_file){
+   if(!get_file || !addr){
       exit(-1);
    }
    return do_mmap(addr,length,writable,get_file,offset);
