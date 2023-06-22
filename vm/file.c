@@ -103,7 +103,7 @@ do_munmap (void *addr) {
             file_write_at(container->file, addr, container->page_read_bytes, container->offset);
 			lock_release(&filesys_lock);
 			pml4_set_dirty(thread_current()->pml4,addr,0);
-        	// pml4_clear_page(thread_current()->pml4,addr);
+        	pml4_clear_page(thread_current()->pml4,addr);
         }
         // file_close(container->file);
         addr+= PGSIZE;

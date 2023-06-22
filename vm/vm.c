@@ -192,6 +192,7 @@ bool
 vm_try_handle_fault (struct intr_frame *f , void *addr,
 		bool user , bool write, bool not_present ) {
 	/* addr은 page_fault에서 보낸 fault address */
+	
 	if(!not_present)
 		exit(-1);
 	if(addr == NULL || is_kernel_vaddr(addr) || addr == 0x04000000){
@@ -212,13 +213,46 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	// }
 
 	page = spt_find_page(spt, addr);
+	
+	
 	if(!page &&!user)	
 		exit(-1);
+	
 	/* 유저가 호출하고, 페이지가 없고, 주소값이 스택영역에 해당될 경우 */
-	if( user && !page && addr < USER_STACK && addr >= (USER_STACK-0x100000)/*  && (addr > (f->rsp-PGSIZE)) */){
-		if( addr <= (f->rsp-PGSIZE))
+	uintptr_t stack_min = USER_STACK-0x100000;
+	if(addr == (f->rsp-PGSIZE))
+		exit(-1);
+
+	if( !page && addr < USER_STACK && addr > USER_STACK-0x100000)/*  && (addr > (f->rsp-PGSIZE)) */{
+		if(user){
+			uintptr_t RSP = f->rsp;
+			
+			/* grow bad 잡는거였어 */
+			// if( addr <= (f->rsp-PGSIZE))
+			// 	exit(-1);
+			uintptr_t find_stack_bottom;
+			for( uintptr_t i = USER_STACK-1;i> USER_STACK-0x100000; i-=PGSIZE){
+				if(!spt_find_page(spt,i)){
+					find_stack_bottom = pg_round_down(i);
+					break;
+				}
+			}
+			for( uintptr_t i = find_stack_bottom;i> addr; i-=PGSIZE){
+				vm_stack_growth(i);
+			}
+			// printf("previous stack bottom %p \n", find_stack_bottom);
+			// printf("addr = %p\n",addr);
+			// printf(" rsp = %p\n", RSP);
+			vm_stack_growth(addr);
+		}
+		else{ /* kernel 일때 */
 			exit(-1);
-		vm_stack_growth(addr);
+			// uintptr_t RSP = thread_current()->parent_if.rsp;
+
+			
+			// vm_stack_growth(addr);
+		}
+
 		return true;
 	}
 	else{
@@ -341,11 +375,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	hash_first(&i,spt->hash_vm);
 	while(hash_next(&i)){
 		struct page *page = hash_entry(hash_cur(&i), struct page ,h_elem);
-		// do_munmap(page->va);
-		
-		// if(page_get_type(0x10000000) == VM_UNINIT){	
-		// 	PANIC("page get type = %d\n\n",page_get_type(0x10000000));
-		// }	
 		if(page_get_type(page) == VM_FILE)
 			do_munmap(page->va);
 	}
