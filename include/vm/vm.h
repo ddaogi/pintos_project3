@@ -4,7 +4,7 @@
 #include "threads/palloc.h"
 #include <hash.h>
 
-enum vm_type {
+enum vm_type { 
 	/* page not initialized */
 	VM_UNINIT = 0,
 	/* page not related to the file, aka anonymous page */
