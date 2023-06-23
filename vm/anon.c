@@ -39,11 +39,7 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler 
 	이것은 익명 페이지의 이니셜라이저입니다. 스와핑을 지원하려면 anon_page에 몇 가지 정보를 추가해야 합니다.*/
 	page->operations = &anon_ops;
-	// page->frame->kva = kva; //이걸까?
-	//음...
-	
-	//몇가지 정보가 뭔데 그래서
-	
+
 	struct anon_page *anon_page = &page->anon;
 }
 
@@ -55,9 +51,10 @@ static bool
 anon_swap_in (struct page *page, void *kva) {
 	/* 스왑 디스크 데이터 내용을 읽어서 익명 페이지를(디스크에서 메모리로)  swap in합니다. 
 	스왑 아웃 될 때 페이지 구조체는 스왑 디스크에 저장되어 있어야 합니다. 스왑 테이블을 업데이트해야 합니다(스왑 테이블 관리 참조). */
-	
+	if(bitmap_test(swap_table,(page->disk_sec_no)) ==false)
+		return false;
 	for(uintptr_t i = 0 ;i<8;i++){
-		disk_read(swap_disk,(page->disk_sec_no)+i,kva+(i*512));
+		disk_read(swap_disk,(page->disk_sec_no)*8+i,kva+(i*512));
 	}
 	bitmap_set(swap_table,page->disk_sec_no,false);
 	page->is_loaded = 1;
@@ -81,9 +78,9 @@ anon_swap_out (struct page *page) {
 			for(uintptr_t j = 0; j<8;j++){
 				disk_write(swap_disk, i*8+j, page->frame->kva+(j*512));
 			}
-			pml4_clear_page(page->frame->thread->pml4,page->va);
 			bitmap_set(swap_table,i,true);
-			page->disk_sec_no = i*8;
+			pml4_clear_page(page->frame->thread->pml4,page->va);
+			page->disk_sec_no = i;
 			page->frame->page = NULL;
 			page->frame = NULL;
 			page->is_loaded = 0;

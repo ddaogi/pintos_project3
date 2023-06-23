@@ -139,20 +139,17 @@ vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
 	
-	for(struct list_elem* i = list_begin(&frame_list);i != list_end(&frame_list); i= list_next(i)){
+	for(struct list_elem* i = list_pop_front(&frame_list); i != list_end(&frame_list); i= list_next(i)){
 		struct frame* temp_f = list_entry(i,struct frame, f_elem);
 		/* 최근에 이 페이지가 사용되지 않았으면 */
 		if(!pml4_is_accessed(temp_f->thread->pml4,temp_f->page->va)){
-			pml4_set_accessed(temp_f->thread->pml4,temp_f->page->va, 0);
-			victim = temp_f;	
-		
+			victim = temp_f;
+			pml4_set_accessed(victim->thread->pml4,temp_f->page->va, 0);
 			break;
 		}
-			
-		// else{
-		// 	pml4_set_accessed(temp_f->thread->pml4, temp_f->page->va, 0);
-		// }
-		
+		else{
+			list_push_back(&frame_list,i);
+		}
 	}
 	if(victim == NULL){
 		victim = list_entry(list_pop_front(&frame_list),struct frame, f_elem);
