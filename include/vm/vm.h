@@ -58,7 +58,7 @@ struct page {
 
 	struct hash_elem h_elem;
 	void* init_address;
-
+	int disk_sec_no;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -75,6 +75,8 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem f_elem;
+	struct thread* thread;
 };
 
 /* The function table for page operations.
@@ -133,4 +135,9 @@ struct aux_struct{
 unsigned page_hash (const struct hash_elem *, void *);
 bool page_less (const struct hash_elem *, const struct hash_elem *, void *);
 void page_in_hash_free(struct hash_elem *hash_elem, void* aux);
+
+struct list frame_list;
+struct bitmap* swap_table;
+
+
 #endif  /* VM_VM_H */
