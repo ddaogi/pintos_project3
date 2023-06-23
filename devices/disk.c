@@ -132,7 +132,6 @@ disk_init (void) {
 
 			d->is_ata = false;
 			d->capacity = 0;
-
 			d->read_cnt = d->write_cnt = 0;
 		}
 
@@ -182,6 +181,10 @@ disk_print_stats (void) {
 1:0 - scratch
 1:1 - swap
 */
+
+/* DEV_NO와 CHAN_NO에 따라 디스크 번호를 반환합니다. 이때, 마스터와 슬레이브에 대해 각각 0과 1로 번호를 매깁니다. CHAN_NO에 해당하는 채널 내에서의 디스크 번호는 다음과 같습니다:*/
+
+
 struct disk *
 disk_get (int chan_no, int dev_no) {
 	ASSERT (dev_no == 0 || dev_no == 1);
@@ -196,6 +199,9 @@ disk_get (int chan_no, int dev_no) {
 
 /* Returns the size of disk D, measured in DISK_SECTOR_SIZE-byte
    sectors. */
+
+/* 디스크 D의 크기를 DISK_SECTOR_SIZE 바이트 섹터 단위로 반환합니다. */
+
 disk_sector_t
 disk_size (struct disk *d) {
 	ASSERT (d != NULL);
@@ -207,6 +213,10 @@ disk_size (struct disk *d) {
    room for DISK_SECTOR_SIZE bytes.
    Internally synchronizes accesses to disks, so external
    per-disk locking is unneeded. */
+
+/* 디스크 D로부터 섹터 SEC_NO를 BUFFER로 읽어들입니다. 
+BUFFER는 DISK_SECTOR_SIZE 바이트를 담을 수 있는 공간이어야 합니다.
+내부적으로 디스크 접근을 동기화하므로, 외부에서 디스크별로 잠금을 설정할 필요가 없습니다. */
 void
 disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) {
 	struct channel *c;
@@ -231,6 +241,9 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) {
    acknowledged receiving the data.
    Internally synchronizes accesses to disks, so external
    per-disk locking is unneeded. */
+/* 섹터 SEC_NO를 BUFFER에서 디스크 D로 기록합니다. BUFFER는 DISK_SECTOR_SIZE 바이트를 포함해야 합니다.
+데이터가 디스크로 전송되고 확인되면 반환됩니다.
+내부적으로 디스크 접근을 동기화하므로, 외부에서 디스크별로 잠금을 설정할 필요가 없습니다. */
 void
 disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer) {
 	struct channel *c;
@@ -249,7 +262,7 @@ disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer) {
 	d->write_cnt++;
 	lock_release (&c->lock);
 }
-
+
 /* Disk detection and identification. */
 
 static void print_ata_string (char *string, size_t size);

@@ -11,6 +11,8 @@
 #include <string.h>
 #include "userprog/process.h"
 
+#include <bitmap.h>
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -136,7 +138,25 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-
+	
+	for(struct list_elem* i = list_begin(&frame_list);i != list_end(&frame_list); i= list_next(i)){
+		struct frame* temp_f = list_entry(i,struct frame, f_elem);
+		/* 최근에 이 페이지가 사용되지 않았으면 */
+		if(!pml4_is_accessed(temp_f->thread->pml4,temp_f->page->va)){
+			pml4_set_accessed(temp_f->thread->pml4,temp_f->page->va, 0);
+			victim = temp_f;	
+		
+			break;
+		}
+			
+		// else{
+		// 	pml4_set_accessed(temp_f->thread->pml4, temp_f->page->va, 0);
+		// }
+		
+	}
+	if(victim == NULL){
+		victim = list_entry(list_pop_front(&frame_list),struct frame, f_elem);
+	}
 	return victim;
 }
 
@@ -147,7 +167,11 @@ vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 
-	return NULL;
+	swap_out(victim->page);
+
+	return victim;
+
+	// return NULL;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -163,11 +187,12 @@ vm_get_frame (void) {
 	void* new_page = palloc_get_page(PAL_USER);
 
     if(new_page == NULL){
-        PANIC("todo");
-    }else{
-        frame->kva = new_page;
-        frame->page = NULL;
+        new_page = vm_evict_frame()->kva;
     }
+	frame->page = NULL;
+	list_push_back(&frame_list,&frame->f_elem);
+	frame->thread = thread_current();
+	frame->kva = new_page;
     ASSERT (frame != NULL);
     ASSERT (frame->page == NULL);
 	return frame;
@@ -195,7 +220,7 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	
 	if(!not_present)
 		exit(-1);
-	if(addr == NULL || is_kernel_vaddr(addr) || addr == 0x04000000){
+	if(addr == NULL || is_kernel_vaddr(addr)){
 		return false;
 	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
@@ -206,7 +231,7 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	/* not present 가 false면 readonly 페이지에 write 하려는 상황*/
 
 	/* 할당되지 않은 공간에 접근할 때 */
-	
+
 	// if(!spt_find_page(spt,f->rsp) && user){
 	// 	vm_stack_growth(f->rsp);
 	// 	return true;
@@ -219,11 +244,11 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 		exit(-1);
 	
 	/* 유저가 호출하고, 페이지가 없고, 주소값이 스택영역에 해당될 경우 */
-	uintptr_t stack_min = USER_STACK-0x100000;
+	uintptr_t stack_min = USER_STACK-(1<<20);
 	if(addr == (f->rsp-PGSIZE))
 		exit(-1);
 
-	if( !page && addr < USER_STACK && addr > USER_STACK-0x100000)/*  && (addr > (f->rsp-PGSIZE)) */{
+	if( !page && addr < USER_STACK && addr > USER_STACK-(1<<20))/*  && (addr > (f->rsp-PGSIZE)) */{
 		if(user){
 			uintptr_t RSP = f->rsp;
 			
@@ -231,7 +256,7 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 			// if( addr <= (f->rsp-PGSIZE))
 			// 	exit(-1);
 			uintptr_t find_stack_bottom;
-			for( uintptr_t i = USER_STACK-1;i> USER_STACK-0x100000; i-=PGSIZE){
+			for( uintptr_t i = USER_STACK-1;i> USER_STACK-(1<<20); i-=PGSIZE){
 				if(!spt_find_page(spt,i)){
 					find_stack_bottom = pg_round_down(i);
 					break;
@@ -295,7 +320,6 @@ vm_do_claim_page (struct page *page) {
 	
     // bool succ = install_page(page->va,frame->kva,page->writable);
 	bool succ = (pml4_get_page(thread_current()->pml4, page->va) == NULL && pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable));
-	
     if (!succ){
 		return false;
 	} 
@@ -342,6 +366,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 		/* dst에 알아서 struct page를 넣어줌 */
 
 		// vm_alloc_page(src_type,upage,src_p->writable);
+		
 		if(!vm_alloc_page_with_initializer(src_p->uninit.type, src_p->va, src_p->writable, src_p->uninit.init, src_p->uninit.aux))
 			return false;
 
@@ -353,7 +378,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst /*UNUSED*/,
 	}
 	return true;
 }
-/* Free the resource hold by the supplemental page table */
+/* Free the resource hold by the supplemental page table */ 
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread an
