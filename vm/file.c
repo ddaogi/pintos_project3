@@ -36,13 +36,29 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+	struct aux_struct* container = page->uninit.aux;
+	file_read_at(container->file,page->va,container->page_read_bytes,container->offset);
+	return true;
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-	// do_munmap(page->va);
+	 if (page == NULL) {
+            return;
+        }
+        struct aux_struct* container = page->uninit.aux;
+        if(container->file == NULL) return;
+        // file_reopen(container->file);
+        if(pml4_is_dirty(thread_current()->pml4,page->va)){
+			lock_acquire(&filesys_lock);
+			file_seek(container->file, container->offset);
+            file_write_at(container->file, page->va, container->page_read_bytes, container->offset);
+			lock_release(&filesys_lock);
+			pml4_set_dirty(thread_current()->pml4,page->va,0);
+        }
+        pml4_clear_page(thread_current()->pml4,page->va);
 	return true;
 }
 
