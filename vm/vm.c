@@ -222,18 +222,6 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 	}
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-	/* spt_find_page 를 거쳐 보조 페이지 테이블을 참고하여 fault된 주소에 대응하는 페이지 구조체를 해결하기 위한
-	 함수 vm_try_handle_fault를 수정하세요. */
-	
-	/* not present 가 false면 readonly 페이지에 write 하려는 상황*/
-
-	/* 할당되지 않은 공간에 접근할 때 */
-
-	// if(!spt_find_page(spt,f->rsp) && user){
-	// 	vm_stack_growth(f->rsp);
-	// 	return true;
-	// }
-
 	page = spt_find_page(spt, addr);
 	
 	
@@ -247,11 +235,6 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 
 	if( !page && addr < USER_STACK && addr > USER_STACK-(1<<20))/*  && (addr > (f->rsp-PGSIZE)) */{
 		if(user){
-			uintptr_t RSP = f->rsp;
-			
-			/* grow bad 잡는거였어 */
-			// if( addr <= (f->rsp-PGSIZE))
-			// 	exit(-1);
 			uintptr_t find_stack_bottom;
 			for( uintptr_t i = USER_STACK-1;i> USER_STACK-(1<<20); i-=PGSIZE){
 				if(!spt_find_page(spt,i)){
@@ -262,18 +245,11 @@ vm_try_handle_fault (struct intr_frame *f , void *addr,
 			for( uintptr_t i = find_stack_bottom;i> addr; i-=PGSIZE){
 				vm_stack_growth(i);
 			}
-			// printf("previous stack bottom %p \n", find_stack_bottom);
-			// printf("addr = %p\n",addr);
-			// printf(" rsp = %p\n", RSP);
 			vm_stack_growth(addr);
 		}
 		else{ /* kernel 일때 */
 			exit(-1);
-			// uintptr_t RSP = thread_current()->parent_if.rsp;
-
-			
-			// vm_stack_growth(addr);
-		}
+		} 
 
 		return true;
 	}
@@ -385,12 +361,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	페이지 엔트리를 반복하면서 테이블의 페이지에 destroy(page)를 호출해야함
 	실제 페이지 테이블(pml4)와 물리 주소(palloc된 메모리)에 대해 걱정할 필요가 없다.
 	supplemental page table이 정리되어지고 나서, 호출자가 그것들을 정리할 것입니다.*/
-	// struct hash_iterator i;
-	// hash_first(&i,&src->hash_vm);
-	// while(hash_next(&i)){
-	// 	struct page *src_p = hash_entry(hash_cur(&i), struct page ,h_elem);
-	// 	enum vm_type src_type = page_get_type(src_p);
-	// }
 	if(spt == NULL) return;
 	if(spt->hash_vm == NULL) return;
 	struct hash_iterator i;
@@ -400,16 +370,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 		if(page_get_type(page) == VM_FILE)
 			do_munmap(page->va);
 	}
-	// struct thread* cur = thread_current();
-	// for (int i = FD_MIN; i < FD_MAX; i++) // 심심좌 암살
-    //   close(i);
-   	// palloc_free_multiple(cur->fdt, 3); // 심심좌 암살
-   	// cur->fdt = NULL;                   // 심심좌 암살
-   	// file_close(cur->running_file);
-
-	// hash_init(spt->hash_vm,page_hash,page_less,NULL); 
-	
-	// hash_destroy(spt->hash_vm, page_in_hash_free);
 }
 
 
