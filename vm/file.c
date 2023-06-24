@@ -4,6 +4,7 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -41,6 +42,8 @@ file_backed_swap_in (struct page *page, void *kva) {
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	// do_munmap(page->va);
+	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
@@ -55,13 +58,15 @@ void *
 do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
 	
 	struct file *re_file = file_reopen(file);
+	if (re_file ==NULL){
+		return NULL;
+	}
 	// uint32_t read_bytes = file_length(re_file);
 	uint32_t read_bytes = file_length(re_file);
-
 	void* init_addr = addr;
 	void* upage = addr;
 		
-	while(read_bytes >0 /* || zero_bytes >0 */){
+	while(read_bytes > 0 /* || zero_bytes >0 */){
 		
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 
@@ -103,8 +108,8 @@ do_munmap (void *addr) {
             file_write_at(container->file, addr, container->page_read_bytes, container->offset);
 			lock_release(&filesys_lock);
 			pml4_set_dirty(thread_current()->pml4,addr,0);
-        	pml4_clear_page(thread_current()->pml4,addr);
         }
+        pml4_clear_page(thread_current()->pml4,addr);
         // file_close(container->file);
         addr+= PGSIZE;
 	}

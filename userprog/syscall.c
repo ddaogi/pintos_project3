@@ -395,21 +395,19 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
    struct file* get_file = process_get_file(fd);
    // PANIC(" addr = %llu, length = %llu  sum = %llu \n\n",addr,length , addr+length);
    
-   if( offset% PGSIZE !=0 ||  length ==0 || is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0 
+   if( offset% PGSIZE !=0 || length ==0 || is_kernel_vaddr(addr) || is_kernel_vaddr(addr+length) || (addr+length) == 0 
       || (uintptr_t)addr % PGSIZE != 0 || addr < 0x6050c0  || (addr < USER_STACK && addr>(USER_STACK - (1<<20))) )
       return NULL;
    
    struct page *temp_p = spt_find_page(&thread_current()->spt,addr);
-   if(temp_p &&  !pml4_is_dirty(thread_current()->pml4,addr)){
+   if(temp_p && !pml4_is_dirty(thread_current()->pml4,addr)){
       return NULL;
    }
-   
-
    if( offset > PGSIZE){
       return NULL;
    }
    if(!get_file){
-      exit(-1);
+      return NULL;
    }
    return do_mmap(addr,length,writable,get_file,offset);
 
